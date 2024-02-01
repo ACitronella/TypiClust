@@ -1,5 +1,5 @@
 # Typiclust and ProbCover Official Code Repository
-
+ 
 
 This is the official implementation for the papers **Active Learning on a Budget - Opposite Strategies Suit High and Low Budgets** and **Active Learning Through a Covering Lens**. 
 
