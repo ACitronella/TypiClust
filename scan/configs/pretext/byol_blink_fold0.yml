@@ -1,0 +1,38 @@
+# Setup
+setup: byol
+# simclr_pe
+
+# Model
+backbone: resnet50
+model_kwargs:
+   head: mlp
+   features_dim: 256
+
+# Dataset
+train_db_name: blink_fold0
+val_db_name: blink
+num_classes: 10
+fold_idx: 0
+
+# Loss # loss in byol will be ignore
+criterion: simclr
+criterion_kwargs:
+   temperature: 0.1 
+
+# Hyperparameters
+epochs: 500
+optimizer: adam
+optimizer_kwargs:
+   lr: 0.0003
+scheduler: constant
+batch_size: 64
+num_workers: 12
+
+# Transformations # the learner from library already has augmentation built-in. so we turn off our own
+augmentation_strategy: same_as_val
+
+transformation_kwargs:
+   crop_size: 256
+   normalize:
+      mean: [0.4914, 0.4822, 0.4465]
+      std: [0.2023, 0.1994, 0.2010]
