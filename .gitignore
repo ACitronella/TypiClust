@@ -34,3 +34,6 @@ output/
 *.ipynb_checkpoints/
 data/
 scan/results/
+
+deep-al/*model_graveyard*
+deep-al/tools/log/
