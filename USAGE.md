@@ -36,6 +36,7 @@ To train CIFAR-10 on simclr please run
 ```
 cd scan
 python simclr.py --config_env configs/env.yml --config_exp configs/pretext/simclr_cifar10.yml
+python blink_simclr.py --config_env configs/env.yml --config_exp configs/pretext/simclr_blink_foldn.yml --seed s # fill in the fold number and seed
 cd ..
 ```
 When this finishes, the file `./results/cifar-10/pretext/features_seed1.npy` should exist.
@@ -55,6 +56,7 @@ To select samples according to TypiClust (K-Means) where the `initial_size=0` an
 ```
 cd deep-al/tools
 python train_al.py --cfg ../configs/cifar10/al/RESNET18.yaml --al typiclust_rp --exp-name auto --initial_size 0 --budget 100
+python train_al.py --cfg ../configs/blink/al/fold0.yaml --al typiclust_rp --exp-name auto --initial_size 0 --budget 10
 cd ../../
 ```
 

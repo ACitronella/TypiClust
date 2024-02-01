@@ -1,16 +1,39 @@
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn as nn
+import math
 import pycls.datasets.utils as ds_utils
 
-class ProbCover:
-    def __init__(self, cfg, lSet, uSet, budgetSize, delta, embedding_path):
+class CatPositionalEncoding(nn.Module):
+
+    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
+        super().__init__()
+        # self.dropout = nn.Dropout(p=dropout)
+
+        position = torch.arange(max_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))
+        pe = torch.zeros(max_len, d_model)
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        """
+        Arguments:
+            x: Tensor, shape ``[seq_len, embedding_dim]``
+        """
+        x = torch.cat((x, self.pe[:x.shape[0]]), axis=1)
+        # return self.dropout(x)
+        return x
+
+
+class ProbCoverCatPE:
+    def __init__(self, cfg, lSet, uSet, budgetSize, delta, dataset_info):
         self.cfg = cfg
         self.ds_name = self.cfg['DATASET']['NAME']
         self.seed = self.cfg['RNG_SEED']
-        self.embedding_path = embedding_path
-        # self.all_features = ds_utils.load_features(self.ds_name, self.seed)
-        self.all_features = ds_utils.load_embededing_from_path(embedding_path)
+        self.all_features = ds_utils.load_features(self.ds_name, self.seed)
         self.lSet = lSet
         self.uSet = uSet
         self.budgetSize = budgetSize
@@ -18,6 +41,18 @@ class ProbCover:
         self.relevant_indices = np.concatenate([self.lSet, self.uSet]).astype(int)
         self.rel_features = self.all_features[self.relevant_indices]
         self.graph_df = self.construct_graph()
+
+        self.dataset_info = dataset_info
+        self.indices_table = (self.dataset_info["frames"].cumsum() - self.dataset_info["frames"]).values # collect start index of each eye
+        self.indices_table = np.concatenate([self.indices_table, [self.dataset_info["frames"].sum()]]) # for last file
+        self.pe = CatPositionalEncoding(d_model=512)
+        self.all_features = torch.from_numpy(self.all_features)
+        self.new_features = torch.zeros((self.all_features.shape[0], self.all_features.shape[1]*2))
+        for start_idx, end_idx in zip(self.indices_table, self.indices_table[1:]):
+            self.new_features[start_idx:end_idx] = self.pe(self.all_features[start_idx:end_idx])
+        self.all_features = self.new_features.numpy()
+
+
 
     def construct_graph(self, batch_size=500):
         """

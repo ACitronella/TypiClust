@@ -4,6 +4,7 @@
 
 from .Sampling import Sampling, CoreSetMIPSampling, AdversarySampler
 import pycls.utils.logging as lu
+import numpy as np
 
 logger = lu.get_logger(__name__)
 
@@ -17,7 +18,7 @@ class ActiveLearning:
         self.sampler = Sampling(dataObj=dataObj,cfg=cfg)
         self.cfg = cfg
         
-    def sample_from_uSet(self, clf_model, lSet, uSet, trainDataset, supportingModels=None):
+    def sample_from_uSet(self, clf_model, lSet, uSet, trainDataset, supportingModels=None, **kwargs):
         """
         Sample from uSet using cfg.ACTIVE_LEARNING.SAMPLING_FN.
 
@@ -72,19 +73,107 @@ class ActiveLearning:
             
             clf_model.penultimate_active = waslatent
             clf_model.train(wastrain)
+        elif self.cfg.ACTIVE_LEARNING.SAMPLING_FN == "typiclust_add_pe":
+            from .typiclust_add_pe import TypiClustAddPE
+            dataset_info = kwargs.get("dataset_info", None)
+            assert dataset_info is not None 
+            tpc = TypiClustAddPE(self.cfg, lSet, uSet, budgetSize=self.cfg.ACTIVE_LEARNING.BUDGET_SIZE, dataset_info=dataset_info)
+            activeSet, uSet = tpc.select_samples()
+            return activeSet, uSet
+        elif self.cfg.ACTIVE_LEARNING.SAMPLING_FN == "typiclust_cat_pe":
+            from .typiclust_cat_pe import TypiClustCatPE
+            dataset_info = kwargs.get("dataset_info", None)
+            assert dataset_info is not None 
+            tpc = TypiClustCatPE(self.cfg, lSet, uSet, budgetSize=self.cfg.ACTIVE_LEARNING.BUDGET_SIZE, dataset_info=dataset_info)
+            activeSet, uSet = tpc.select_samples()
+            return activeSet, uSet
+        elif self.cfg.ACTIVE_LEARNING.SAMPLING_FN == "typiclust_idx_pe":
+            from .typiclust_idx_pe import TypiClustIdxPE
+            is_scan = self.cfg.ACTIVE_LEARNING.SAMPLING_FN.endswith('dc')
+            dataset_info = kwargs.get("dataset_info", None)
+            assert dataset_info is not None
+            tpc = TypiClustIdxPE(self.cfg, lSet, uSet, budgetSize=self.cfg.ACTIVE_LEARNING.BUDGET_SIZE, dataset_info=dataset_info)
+            activeSet, uSet = tpc.select_samples()
+            return activeSet, uSet
+        elif self.cfg.ACTIVE_LEARNING.SAMPLING_FN == "typiclust_patient_wise":
+            from .typiclust_patient_wise import TypiClustPatientWise
+            is_scan = False # is scan is not allow
+            dataset_info = kwargs.get("dataset_info", None)
+            activeSet = []
+            newuSet = []
+            indices_table = (dataset_info["frames"].cumsum() - dataset_info["frames"]).values # collect start index of each eye
+            indices_table = np.concatenate([indices_table, [ int(dataset_info["frames"].sum())]]) # for last file
+            for start_idx, stop_idx in zip(indices_table, indices_table[1:]):
+                thispatient_lset = lSet[(lSet >= start_idx) & (lSet < stop_idx)]
+                thispatient_uset = uSet[(uSet >= start_idx) & (uSet < stop_idx)]
+                tpc = TypiClustPatientWise(self.cfg, thispatient_lset, thispatient_uset, budgetSize=self.cfg.ACTIVE_LEARNING.BUDGET_SIZE, start_idx=start_idx, is_scan=is_scan, dataset_info=dataset_info)
+                thispatient_activeSet, thispatient_uset = tpc.select_samples()
+                activeSet.append(thispatient_activeSet)
+                newuSet.append(thispatient_uset)
+            return np.concatenate(activeSet), np.concatenate(newuSet)
 
         elif self.cfg.ACTIVE_LEARNING.SAMPLING_FN.startswith("typiclust"):
             from .typiclust import TypiClust
             is_scan = self.cfg.ACTIVE_LEARNING.SAMPLING_FN.endswith('dc')
-            tpc = TypiClust(self.cfg, lSet, uSet, budgetSize=self.cfg.ACTIVE_LEARNING.BUDGET_SIZE, is_scan=is_scan)
+            dataset_info = kwargs.get("dataset_info", None) 
+            assert dataset_info is not None
+            tpc = TypiClust(self.cfg, lSet, uSet, self.cfg.ACTIVE_LEARNING.BUDGET_SIZE, self.cfg.ACTIVE_LEARNING.EMBEDDING_PATH, is_scan=is_scan, dataset_info=dataset_info)
             activeSet, uSet = tpc.select_samples()
+            return activeSet, uSet, tpc.clusters
 
+        elif self.cfg.ACTIVE_LEARNING.SAMPLING_FN == 'probcover_cat_pe':
+            from .prob_cover_cat_pe import ProbCoverCatPE
+            dataset_info = kwargs["dataset_info"]
+            probcov = ProbCoverCatPE(self.cfg, lSet, uSet, budgetSize=self.cfg.ACTIVE_LEARNING.BUDGET_SIZE,
+                            delta=self.cfg.ACTIVE_LEARNING.DELTA, dataset_info=dataset_info)
+            activeSet, uSet = probcov.select_samples()
+ 
+        elif self.cfg.ACTIVE_LEARNING.SAMPLING_FN == 'probcover_idx_pe':
+            from .prob_cover_idx_pe import ProbCoverIdxPE
+            dataset_info = kwargs["dataset_info"]
+            probcov = ProbCoverIdxPE(self.cfg, lSet, uSet, budgetSize=self.cfg.ACTIVE_LEARNING.BUDGET_SIZE,
+                            delta=self.cfg.ACTIVE_LEARNING.DELTA, dataset_info=dataset_info)
+            activeSet, uSet = probcov.select_samples()
+        elif self.cfg.ACTIVE_LEARNING.SAMPLING_FN == 'probcover_idx_dist':
+            from .prob_cover_idx_dist import ProbCoverIdxDist
+            dataset_info = kwargs["dataset_info"]
+            frame_diff_factor = self.cfg.ACTIVE_LEARNING.FRAME_DIFF_FACTOR
+            probcov = ProbCoverIdxDist(self.cfg, lSet, uSet, self.cfg.ACTIVE_LEARNING.BUDGET_SIZE,
+                            delta=self.cfg.ACTIVE_LEARNING.DELTA, embedding_path=self.cfg.ACTIVE_LEARNING.EMBEDDING_PATH, dataset_info=dataset_info, frame_diff_factor=frame_diff_factor)
+            activeSet, uSet = probcov.select_samples()
+        elif self.cfg.ACTIVE_LEARNING.SAMPLING_FN == 'probcover_idx_standard_dist':
+            from .prob_cover_idx_standarddist import ProbCoverIdxStandardDist
+            dataset_info = kwargs["dataset_info"]
+            frame_diff_factor = self.cfg.ACTIVE_LEARNING.FRAME_DIFF_FACTOR
+            probcov = ProbCoverIdxStandardDist(self.cfg, lSet, uSet, self.cfg.ACTIVE_LEARNING.BUDGET_SIZE,
+                            delta=self.cfg.ACTIVE_LEARNING.DELTA, embedding_path=self.cfg.ACTIVE_LEARNING.EMBEDDING_PATH, dataset_info=dataset_info, frame_diff_factor=frame_diff_factor)
+            activeSet, uSet = probcov.select_samples()
+        elif self.cfg.ACTIVE_LEARNING.SAMPLING_FN == 'probcover_idx_standard_dist_div2':
+            from .prob_cover_idx_standarddist_div2 import ProbCoverIdxStandardDistDiv2
+            dataset_info = kwargs["dataset_info"]
+            frame_diff_factor = self.cfg.ACTIVE_LEARNING.FRAME_DIFF_FACTOR
+            probcov = ProbCoverIdxStandardDistDiv2(self.cfg, lSet, uSet, self.cfg.ACTIVE_LEARNING.BUDGET_SIZE,
+                            delta=self.cfg.ACTIVE_LEARNING.DELTA, embedding_path=self.cfg.ACTIVE_LEARNING.EMBEDDING_PATH, dataset_info=dataset_info, frame_diff_factor=frame_diff_factor)
+            activeSet, uSet = probcov.select_samples()
+        
         elif self.cfg.ACTIVE_LEARNING.SAMPLING_FN.lower() in ["prob_cover", 'probcover']:
             from .prob_cover import ProbCover
             probcov = ProbCover(self.cfg, lSet, uSet, budgetSize=self.cfg.ACTIVE_LEARNING.BUDGET_SIZE,
-                            delta=self.cfg.ACTIVE_LEARNING.DELTA)
+                            delta=self.cfg.ACTIVE_LEARNING.DELTA, embedding_path=self.cfg.ACTIVE_LEARNING.EMBEDDING_PATH)
             activeSet, uSet = probcov.select_samples()
-
+        elif self.cfg.ACTIVE_LEARNING.SAMPLING_FN == "random_on_blinking_period":
+            assert self.cfg.DATASET.IS_BLINKING, "is_blinking needed to be true. to restrict the training set to have only blinking part"
+            activeSet, uSet = self.sampler.random(uSet=uSet, budgetSize=self.cfg.ACTIVE_LEARNING.BUDGET_SIZE)
+        # elif self.cfg.ACTIVE_LEARNING.SAMPLING_FN == "random_on_blinking_period_with_proportion":
+        #     self.cfg.ACTIVE_LEARNING.BLINK_FRAME_TO_ALL_RATIO
+        elif self.cfg.ACTIVE_LEARNING.SAMPLING_FN == "embedding_difference_as_probability_density":
+            # assert
+            from .embedding_difference_as_probability_density import EmbeddingDifferenceAsProbabilityDensity
+            dataset_info = kwargs["dataset_info"]
+            al = EmbeddingDifferenceAsProbabilityDensity(self.cfg, lSet, uSet, self.cfg.ACTIVE_LEARNING.BUDGET_SIZE,
+                                                         self.cfg.ACTIVE_LEARNING.EMBEDDING_PATH, dataset_info, kernel_size=11)
+            activeSet, uSet = al.select_samples()
+            
         elif self.cfg.ACTIVE_LEARNING.SAMPLING_FN == "dbal" or self.cfg.ACTIVE_LEARNING.SAMPLING_FN == "DBAL":
             activeSet, uSet = self.sampler.dbal(budgetSize=self.cfg.ACTIVE_LEARNING.BUDGET_SIZE, \
                 uSet=uSet, clf_model=clf_model,dataset=trainDataset)

@@ -16,6 +16,7 @@ from pycls.datasets.custom_datasets import CIFAR10, CIFAR100, MNIST, SVHN
 from pycls.datasets.imbalanced_cifar import IMBALANCECIFAR10, IMBALANCECIFAR100
 from pycls.datasets.sampler import IndexedSequentialSampler
 from pycls.datasets.tiny_imagenet import TinyImageNet
+from pycls.datasets.blink_dataset import BlinkDataset, ImageDataFrameBlinkingWrapper
 logger = lu.get_logger(__name__)
 
 class _RepeatSampler(object):
@@ -145,6 +146,11 @@ class Data:
                 ops = [transforms.RandomCrop(32, padding=4)]
                 norm_mean = [0.4376, 0.4437, 0.4728]
                 norm_std = [0.1980, 0.2010, 0.1970]
+            elif "blink" in self.dataset:
+                # will normalize after this stage
+                # norm_mean = [0.485, 0.456, 0.406]
+                # norm_std = [0.229, 0.224, 0.225]
+                pass
             else:
                 raise NotImplementedError
 
@@ -156,13 +162,14 @@ class Data:
                 #Though RandAugment paper works with WideResNet model
                 ops.append(RandAugmentPolicy(N=self.rand_augment_N, M=self.rand_augment_M))
 
-            elif not self.eval_mode and (self.aug_method == 'hflip'):
+            elif not self.eval_mode and (self.aug_method == 'hflip') and not("blink" in self.dataset):
                 ops.append(transforms.RandomHorizontalFlip())
+            
+            if not("blink" in self.dataset):
+                ops.append(transforms.ToTensor())
+                ops.append(transforms.Normalize(norm_mean, norm_std))
 
-            ops.append(transforms.ToTensor())
-            ops.append(transforms.Normalize(norm_mean, norm_std))
-
-            if self.eval_mode:
+            if self.eval_mode and not("blink" in self.dataset):
                 ops = [ops[0], transforms.ToTensor(), transforms.Normalize(norm_mean, norm_std)]
             else:
                 print("Preprocess Operations Selected ==> ", ops)
@@ -174,7 +181,7 @@ class Data:
             raise NotImplementedError
 
 
-    def getDataset(self, save_dir, isTrain=True, isDownload=False):
+    def getDataset(self, save_dir, isTrain=True, isDownload=False, fold_idx=0, **kwargs):
         """
         This function returns the dataset instance and number of data points in it.
         
@@ -186,6 +193,8 @@ class Data:
         isTrain (optional): Bool, If true then Train partition is downloaded else Test partition.
         
         isDownload (optional): Bool, If true then dataset is saved at path specified by "save_dir".
+
+        fold_idx (optional): int, for BlinkDataset
         
         OUTPUT:
         (On Success) Returns the tuple of dataset instance and length of dataset.
@@ -249,6 +258,12 @@ class Data:
         elif self.dataset ==  'IMBALANCED_CIFAR100':
             im_cifar100 = IMBALANCECIFAR100(save_dir, train=isTrain, transform=preprocess_steps, test_transform=test_preprocess_steps)
             return im_cifar100, len(im_cifar100)
+        elif "blink" in self.dataset:
+            is_blinking = kwargs['is_blinking']
+            im_blink = BlinkDataset(dataset_path=save_dir, train=isTrain, transform=preprocess_steps, test_transform=test_preprocess_steps, fold_idx=fold_idx, use_faster=is_blinking is None)
+            if isinstance(kwargs["is_blinking"], bool):
+                im_blink = ImageDataFrameBlinkingWrapper(im_blink, is_blinking=is_blinking)
+            return im_blink, len(im_blink)
 
         else:
             print("Either the specified {} dataset is not added or there is no if condition in getDataset function of Data class".format(self.dataset))
@@ -299,7 +314,7 @@ class Data:
         #To get the validation index from end we multiply n_datapoints with 1-val_ratio 
         val_splitIdx = int((1-val_split_ratio)*n_dataPoints)
         #Check there should be no overlap with train and val data
-        assert train_split_ratio + val_split_ratio < 1.0, "Validation data over laps with train data as last train index is {} and last val index is {}. \
+        assert train_split_ratio + val_split_ratio <= 1.0, "Validation data over laps with train data as last train index is {} and last val index is {}. \
             The program expects val index > train index. Please satisfy the constraint: train_split_ratio + val_split_ratio < 1.0; currently it is {} + {} is not < 1.0 => {} is not < 1.0"\
                 .format(train_splitIdx, val_splitIdx, train_split_ratio, val_split_ratio, train_split_ratio + val_split_ratio)
         

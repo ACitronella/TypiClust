@@ -54,6 +54,10 @@ def get_model(p, pretrain_path=None):
         elif p['train_db_name'] == 'tiny-imagenet':
             from models.resnet_tinyimagenet import resnet18
             backbone = resnet18()
+        elif 'blink' in p['train_db_name']:
+            # from models.resnet_tinyimagenet_pe import resnet18
+            from models.resnet_tinyimagenet import resnet18
+            backbone = resnet18()
 
         else:
             raise NotImplementedError
@@ -62,7 +66,9 @@ def get_model(p, pretrain_path=None):
         if 'imagenet' in p['train_db_name']:
             from models.resnet import resnet50
             backbone = resnet50()  
-
+        elif 'blink' in p['train_db_name'] and p['setup'] == 'byol':
+            from torchvision import models
+            backbone = models.resnet50(pretrained=True)
         else:
             raise NotImplementedError 
 
@@ -74,14 +80,20 @@ def get_model(p, pretrain_path=None):
         from models.models import ContrastiveModel
         model = ContrastiveModel(backbone, **p['model_kwargs'])
 
+    elif p['setup'] == "simclr_pe":
+        from models.models import ContrastiveModelPE
+        model = ContrastiveModelPE(backbone, **p['model_kwargs'])
+
     elif p['setup'] in ['scan', 'selflabel']:
         from models.models import ClusteringModel
         if p['setup'] == 'selflabel':
             assert(p['num_heads'] == 1)
         model = ClusteringModel(backbone, p['num_classes'], p['num_heads'])
-
+    elif p['setup'] == 'byol':
+        from byol_pytorch import BYOL
+        model = BYOL(backbone, image_size=256, hidden_layer='avgpool') # default setting
     else:
-        raise ValueError('Invalid setup {}'.format(p['setup']))
+        raise ValueError('Invalid setup {}.'.format(p['setup']))
 
     # Load pretrained weights
     if pretrain_path is not None and os.path.exists(pretrain_path):
@@ -147,7 +159,10 @@ def get_train_dataset(p, transform, to_augmented_dataset=False,
         from data.imagenet import ImageNetSubset
         subset_file = './data/imagenet_subsets/%s.txt' %(p['train_db_name'])
         dataset = ImageNetSubset(subset_file=subset_file, split='train', transform=transform)
-
+    elif "blink" in p['train_db_name']:
+        from data.blink_dataset import BlinkDataset
+        dataset = BlinkDataset(train=True, transform=transform, fold_idx=p["fold_idx"])
+        blink_indices_table = dataset.indices_table
     else:
         raise ValueError('Invalid train dataset {}'.format(p['train_db_name']))
     
@@ -160,7 +175,9 @@ def get_train_dataset(p, transform, to_augmented_dataset=False,
         from data.custom_dataset import NeighborsDataset
         indices = np.load(p['topk_neighbors_train_path'])
         dataset = NeighborsDataset(dataset, indices, p['num_neighbors'])
-    
+
+    if "blink" in p['train_db_name']:
+        return dataset, BlinkSampler(blink_indices_table)
     return dataset
 
 
@@ -190,7 +207,10 @@ def get_val_dataset(p, transform=None, to_neighbors_dataset=False):
         from data.imagenet import ImageNetSubset
         subset_file = './data/imagenet_subsets/%s.txt' %(p['val_db_name'])
         dataset = ImageNetSubset(subset_file=subset_file, split='val', transform=transform)
-    
+    elif "blink" in p['train_db_name']:
+        from data.blink_dataset import BlinkDataset
+        dataset = BlinkDataset(train=False, transform=transform)
+
     else:
         raise ValueError('Invalid validation dataset {}'.format(p['val_db_name']))
     
@@ -201,12 +221,41 @@ def get_val_dataset(p, transform=None, to_neighbors_dataset=False):
         dataset = NeighborsDataset(dataset, indices, 5) # Only use 5
 
     return dataset
+import copy
+class BlinkSampler(torch.utils.data.Sampler):
+    def __init__(self, indices_table):
+        # self.rng = np.random.default_rng()
+        indices_table = np.asarray(indices_table)
+        self.start_end_idx = np.asarray((indices_table[:-1], indices_table[1:])).T
+        self.max_frames = np.amax(self.start_end_idx[:, 1] - self.start_end_idx[:, 0])
+        self.rng = np.random.default_rng()
+        self.n = len(self.start_end_idx) * self.max_frames
+        self.available_patient_idx = []
+        for start_idx, end_idx in self.start_end_idx:
+            available_idx = np.concatenate((
+                np.arange(start_idx, end_idx), 
+                self.rng.integers(start_idx, end_idx, size=self.max_frames - (end_idx - start_idx))) ) 
+            self.available_patient_idx.append(available_idx)
 
+    def __iter__(self):
+        available_patient_idx = copy.deepcopy(self.available_patient_idx)
+        for idx in range(len(available_patient_idx)):
+            self.rng.shuffle(available_patient_idx[idx])
+        while all([len(l) != 0 for l in available_patient_idx]):
+            for p_idx in range(len(available_patient_idx)):
+                yield available_patient_idx[p_idx][0]
+                available_patient_idx[p_idx] = available_patient_idx[p_idx][1:]
+ 
+    def __len__(self):
+        return self.n
 
-def get_train_dataloader(p, dataset):
+def get_train_dataloader(p, dataset, sampler=None):
     return torch.utils.data.DataLoader(dataset, num_workers=p['num_workers'], 
             batch_size=p['batch_size'], pin_memory=True, collate_fn=collate_custom,
-            drop_last=True, shuffle=True)
+            drop_last=True, shuffle=sampler is None, prefetch_factor=1, sampler=sampler)
+    # return torch.utils.data.DataLoader(dataset, num_workers=p['num_workers'], 
+    #         batch_size=p['batch_size'], pin_memory=True, collate_fn=collate_custom,
+    #         drop_last=True, shuffle=False)
 
 
 def get_val_dataloader(p, dataset):
@@ -250,7 +299,8 @@ def get_train_transformations(p):
                 n_holes = p['augmentation_kwargs']['cutout_kwargs']['n_holes'],
                 length = p['augmentation_kwargs']['cutout_kwargs']['length'],
                 random = p['augmentation_kwargs']['cutout_kwargs']['random'])])
-    
+    elif p['augmentation_strategy'] == 'same_as_val':
+        return get_val_transformations(p)
     else:
         raise ValueError('Invalid augmentation strategy {}'.format(p['augmentation_strategy']))
 

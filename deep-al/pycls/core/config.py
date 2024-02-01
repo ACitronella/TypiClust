@@ -22,6 +22,10 @@ cfg = _C
 # ---------------------------------------------------------------------------- #
 # Number of GPUs to use (applies to both training and testing)
 _C.NUM_GPUS = 1
+# _C.INDICATE_BEST_BY = "validation_mses_nb"
+_C.MODEL_GRAVEYARD = "../model_graveyard"
+_C.MODEL_INIT_WEIGHTS = "../model_graveyard/init_weights/pipnet_init_weights.pt"
+
 # Output directory (will be created at the projec root)
 _C.OUT_DIR = 'output'
 # Experiment directory
@@ -35,8 +39,6 @@ _C.CFG_DEST = 'config.yaml'
 _C.RNG_SEED = None
 # Folder name where best model logs etc are saved. "auto" creates a timestamp based folder 
 _C.EXP_NAME = 'auto' 
-# Which GPU to run on
-_C.GPU_ID = 0
 # Log destination ('stdout' or 'file')
 _C.LOG_DEST = 'file'
 # Log period in iters
@@ -79,6 +81,7 @@ _C.MODEL.NUM_CLASSES = 10
 # Loss function (see pycls/models/loss.py for options)
 _C.MODEL.LOSS_FUN = 'cross_entropy'
 
+_C.MODEL.LINEAR_FROM_FEATURES = False
 
 # ---------------------------------------------------------------------------- #
 # Batch norm options
@@ -152,6 +155,9 @@ _C.TRAIN.AUTO_RESUME = False
 # Weights to start training from
 _C.TRAIN.WEIGHTS = ''
 _C.TRAIN.TRANSFER_EXP = False
+_C.TRAIN.INDICATE_BEST_BY = 'validation_mses_nb'
+
+_C.TRAIN.NUM_EPOCHS = 20 # out of patient within ... epochs
 
 # ---------------------------------------------------------------------------- #
 # Testing options
@@ -196,6 +202,10 @@ _C.ACTIVE_LEARNING.INIT_L_RATIO = 0.1 # Initial labeled pool ration
 _C.ACTIVE_LEARNING.MAX_ITER = 5 # Max AL iterations
 _C.ACTIVE_LEARNING.FINE_TUNE = True # continue after AL from existing model or from scratch
 
+_C.ACTIVE_LEARNING.EMBEDDING_PATH = "../../scan/results/blink_fold0/pretext/features_seed32.npy" # used by typiclust and probcover
+_C.ACTIVE_LEARNING.DELTA = 0.5 # used by probcover
+_C.ACTIVE_LEARNING.FRAME_DIFF_FACTOR = 0.00005
+_C.ACTIVE_LEARNING.BLINK_FRAME_TO_ALL_RATIO = 1.
 # ---------------------------------------------------------------------------- #
 # Common train/test data loader options
 # ---------------------------------------------------------------------------- #
@@ -226,7 +236,11 @@ _C.DATASET.VAL_RATIO = 0.1
 # Data augmentation methods - 'simclr', 'randaug', 'hflip'
 _C.DATASET.AUG_METHOD = 'hflip' 
 # Accepted Datasets
-_C.DATASET.ACCEPTED = ['MNIST','SVHN','CIFAR10','CIFAR100','TINYIMAGENET', 'IMBALANCED_CIFAR10', 'IMBALANCED_CIFAR100', 'IMAGENET50', 'IMAGENET100', 'IMAGENET200']
+_C.DATASET.ACCEPTED = ["blink_fold0", "blink_fold1", "blink_fold2", "blink_fold3", 'MNIST','SVHN','CIFAR10','CIFAR100','TINYIMAGENET', 'IMBALANCED_CIFAR10', 'IMBALANCED_CIFAR100', 'IMAGENET50', 'IMAGENET100', 'IMAGENET200']
+
+_C.DATASET.FOLD_IDX = 0
+
+_C.DATASET.IS_BLINKING = None # set to None to not filter any frames. True for the frames that is blinking and False for non blinking
 
 def assert_cfg():
     """Checks config values invariants."""

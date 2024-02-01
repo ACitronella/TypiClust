@@ -5,9 +5,86 @@ Licensed under the CC BY-NC 4.0 license (https://creativecommons.org/licenses/by
 import torch
 import numpy as np
 from utils.utils import AverageMeter, ProgressMeter
+from byol_pytorch import BYOL
 
 
 def simclr_train(train_loader, model, criterion, optimizer, epoch):
+    """ 
+    Train according to the scheme from SimCLR
+    https://arxiv.org/abs/2002.05709
+    """
+    losses = AverageMeter('Loss', ':.4e')
+    progress = ProgressMeter(len(train_loader),
+        [losses],
+        prefix="Epoch: [{}]".format(epoch))
+
+    model.train()
+
+    for i, batch in enumerate(train_loader):
+        images = batch['image']
+        if isinstance(model, BYOL):
+            loss = model(images.cuda()) 
+            model.update_moving_average()
+        else:
+            images_augmented = batch['image_augmented']
+            b, c, h, w = images.size()
+            input_ = torch.cat([images.unsqueeze(1), images_augmented.unsqueeze(1)], dim=1)
+            input_ = input_.view(-1, c, h, w) 
+            input_ = input_.cuda(non_blocking=True)
+            # targets = batch['target'].cuda(non_blocking=True)
+
+            output = model(input_)
+            output = output.view(b, 2, -1) 
+            loss = criterion(output)
+        losses.update(loss.item())
+        loss.backward()
+        optimizer.zero_grad()
+        optimizer.step()
+
+        if i % 25 == 0:
+            progress.display(i)
+
+def simclr_pe_train(train_loader, model, criterion, optimizer, epoch):
+    """ 
+    Train according to the scheme from SimCLR
+    https://arxiv.org/abs/2002.05709
+    """
+    losses = AverageMeter('Loss', ':.4e')
+    progress = ProgressMeter(len(train_loader),
+        [losses],
+        prefix="Epoch: [{}]".format(epoch))
+
+    model.train()
+
+    for i, batch in enumerate(train_loader):
+        images = batch['image']
+        if isinstance(model, BYOL):
+            raise NotImplementedError("Bruh, I hope we dont have to get to this point")
+            loss = model(images.cuda()) 
+            model.update_moving_average()
+        else:
+            images_augmented = batch['image_augmented']
+            frame_idx = batch.get("frame_idx", None)
+
+            b, c, h, w = images.size()
+            input_ = torch.cat([images.unsqueeze(1), images_augmented.unsqueeze(1)], dim=1)
+            input_ = input_.view(-1, c, h, w) 
+            input_ = input_.cuda(non_blocking=True)
+        
+            frame_idx = np.repeat(frame_idx, 2) 
+            output = model(input_, frame_idx).view(b, 2, -1)
+            loss = criterion(output)
+        losses.update(loss.item())
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        if i % 25 == 0:
+            progress.display(i)
+
+
+def simclr_train_cpu(train_loader, model, criterion, optimizer, epoch):
     """ 
     Train according to the scheme from SimCLR
     https://arxiv.org/abs/2002.05709
@@ -25,9 +102,8 @@ def simclr_train(train_loader, model, criterion, optimizer, epoch):
         b, c, h, w = images.size()
         input_ = torch.cat([images.unsqueeze(1), images_augmented.unsqueeze(1)], dim=1)
         input_ = input_.view(-1, c, h, w) 
-        input_ = input_.cuda(non_blocking=True)
-        targets = batch['target'].cuda(non_blocking=True)
-
+        # input_ = input_.cuda(non_blocking=True)
+        # targets = batch['target'].cuda(non_blocking=True)
         output = model(input_).view(b, 2, -1)
         loss = criterion(output)
         losses.update(loss.item())
@@ -38,7 +114,6 @@ def simclr_train(train_loader, model, criterion, optimizer, epoch):
 
         if i % 25 == 0:
             progress.display(i)
-
 
 def scan_train(train_loader, model, criterion, optimizer, epoch, update_cluster_head_only=False):
     """ 

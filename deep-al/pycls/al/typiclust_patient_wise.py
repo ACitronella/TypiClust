@@ -45,12 +45,12 @@ def kmeans(features, num_clusters):
     return km.labels_
 
 
-class TypiClust:
+class TypiClustPatientWise:
     MIN_CLUSTER_SIZE = 5
     MAX_NUM_CLUSTERS = 500
     K_NN = 20
 
-    def __init__(self, cfg, lSet, uSet, budgetSize, embedding_path, is_scan=False, dataset_info=None):
+    def __init__(self, cfg, lSet, uSet, budgetSize, embedding_path, start_idx, is_scan=False, dataset_info=None):
         self.cfg = cfg
         self.ds_name = self.cfg['DATASET']['NAME']
         self.seed = self.cfg['RNG_SEED']
@@ -60,15 +60,15 @@ class TypiClust:
         self.uSet = uSet
         self.budgetSize = budgetSize
         self.dataset_info = dataset_info
+        self.start_idx = start_idx
         self.embedding_path = embedding_path
         self.init_features_and_clusters(is_scan)
         
 
     def init_features_and_clusters(self, is_scan):
         num_clusters = min(len(self.lSet) + self.budgetSize, self.MAX_NUM_CLUSTERS)
-        print(f'Clustering into {num_clusters} clustering. Scan clustering: {is_scan}')
+        # print(f'Clustering into {num_clusters} clustering. Scan clustering: {is_scan}')
         if is_scan:
-            assert False, "not supported"
             fname_dict = {'CIFAR10': f'../../scan/results/cifar-10/scan/features_seed{self.seed}_clusters{num_clusters}.npy',
                           'CIFAR100': f'../../scan/results/cifar-100/scan/features_seed{self.seed}_clusters{num_clusters}.npy',
                           'TINYIMAGENET': f'../../scan/results/tiny-imagenet/scan/features_seed{self.seed}_clusters{num_clusters}.npy',
@@ -77,15 +77,19 @@ class TypiClust:
             self.features = np.load(fname)
             self.clusters = np.load(fname.replace('features', 'probs')).argmax(axis=-1)
         else:
-            # self.features = ds_utils.load_features(self.ds_name, self.seed)
-            self.features = ds_utils.load_embededing_from_path(self.embedding_path)
+            # self.features = ds_utils.load_features(self.ds_name, self.seed) 
+            self.features = ds_utils.load_embededing_from_path(self.embedding_path) 
+            relevant_indices = np.concatenate([self.lSet, self.uSet]).astype(int)
+            self.features = self.features[relevant_indices]
             self.clusters = kmeans(self.features, num_clusters=num_clusters)
-        print(f'Finished clustering into {num_clusters} clusters.')
+        # print(f'Finished clustering into {num_clusters} clusters.')
+
+
 
     def select_samples(self):
         # using only labeled+unlabeled indices, without validation set.
-        relevant_indices = np.concatenate([self.lSet, self.uSet]).astype(int)
-        features = self.features[relevant_indices]
+        relevant_indices = np.concatenate([self.lSet, self.uSet]).astype(int) - self.start_idx
+        features = self.features
         labels = np.copy(self.clusters[relevant_indices])
         existing_indices = np.arange(len(self.lSet))
         # counting cluster sizes and number of labeled samples per cluster
@@ -114,9 +118,9 @@ class TypiClust:
         selected = np.array(selected)
         assert len(selected) == self.budgetSize, 'added a different number of samples'
         assert len(np.intersect1d(selected, existing_indices)) == 0, 'should be new samples'
-        activeSet = relevant_indices[selected]
+        activeSet = relevant_indices[selected] + self.start_idx
         remainSet = np.array(sorted(list(set(self.uSet) - set(activeSet))))
 
-        print(f'Finished the selection of {len(activeSet)} samples.')
-        print(f'Active set is {activeSet}')
+        # print(f'Finished the selection of {len(activeSet)} samples.')
+        # print(f'Active set is {activeSet}')
         return activeSet, remainSet

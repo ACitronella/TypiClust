@@ -44,13 +44,35 @@ def kmeans(features, num_clusters):
         km.fit_predict(features)
     return km.labels_
 
+class PositionalEncoding(nn.Module):
 
-class TypiClust:
+    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
+        super().__init__()
+        # self.dropout = nn.Dropout(p=dropout)
+
+        position = torch.arange(max_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))
+        pe = torch.zeros(max_len, d_model)
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        """
+        Arguments:
+            x: Tensor, shape ``[seq_len, embedding_dim]``
+        """
+        x = x + self.pe[:x.shape[0]]
+        # return self.dropout(x)
+        return x
+
+class TypiClustAddPE:
     MIN_CLUSTER_SIZE = 5
     MAX_NUM_CLUSTERS = 500
     K_NN = 20
 
-    def __init__(self, cfg, lSet, uSet, budgetSize, embedding_path, is_scan=False, dataset_info=None):
+    def __init__(self, cfg, lSet, uSet, budgetSize, is_scan=False, dataset_info=None):
+        assert dataset_info is not None
         self.cfg = cfg
         self.ds_name = self.cfg['DATASET']['NAME']
         self.seed = self.cfg['RNG_SEED']
@@ -60,7 +82,9 @@ class TypiClust:
         self.uSet = uSet
         self.budgetSize = budgetSize
         self.dataset_info = dataset_info
-        self.embedding_path = embedding_path
+        self.pe = PositionalEncoding(d_model=512) # d_model is probably embedding size
+        self.indices_table = (self.dataset_info["frames"].cumsum() - self.dataset_info["frames"]).values # collect start index of each eye
+        self.indices_table = np.concatenate([self.indices_table, [self.dataset_info["frames"].sum()]]) # for last file
         self.init_features_and_clusters(is_scan)
         
 
@@ -68,7 +92,6 @@ class TypiClust:
         num_clusters = min(len(self.lSet) + self.budgetSize, self.MAX_NUM_CLUSTERS)
         print(f'Clustering into {num_clusters} clustering. Scan clustering: {is_scan}')
         if is_scan:
-            assert False, "not supported"
             fname_dict = {'CIFAR10': f'../../scan/results/cifar-10/scan/features_seed{self.seed}_clusters{num_clusters}.npy',
                           'CIFAR100': f'../../scan/results/cifar-100/scan/features_seed{self.seed}_clusters{num_clusters}.npy',
                           'TINYIMAGENET': f'../../scan/results/tiny-imagenet/scan/features_seed{self.seed}_clusters{num_clusters}.npy',
@@ -77,10 +100,13 @@ class TypiClust:
             self.features = np.load(fname)
             self.clusters = np.load(fname.replace('features', 'probs')).argmax(axis=-1)
         else:
-            # self.features = ds_utils.load_features(self.ds_name, self.seed)
-            self.features = ds_utils.load_embededing_from_path(self.embedding_path)
+            self.features = ds_utils.load_features(self.ds_name, self.seed) 
+            self.features = torch.from_numpy(self.features)
+            for start_idx, end_idx in zip(self.indices_table, self.indices_table[1:]):
+                self.features[start_idx:end_idx] = self.pe(self.features[start_idx:end_idx])
+            self.features = self.features.numpy()
             self.clusters = kmeans(self.features, num_clusters=num_clusters)
-        print(f'Finished clustering into {num_clusters} clusters.')
+        print(f'Finished clustering into {num_clusters} clusters with positional encoding.')
 
     def select_samples(self):
         # using only labeled+unlabeled indices, without validation set.

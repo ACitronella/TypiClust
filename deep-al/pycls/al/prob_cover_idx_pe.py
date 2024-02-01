@@ -3,14 +3,12 @@ import pandas as pd
 import torch
 import pycls.datasets.utils as ds_utils
 
-class ProbCover:
-    def __init__(self, cfg, lSet, uSet, budgetSize, delta, embedding_path):
+class ProbCoverIdxPE:
+    def __init__(self, cfg, lSet, uSet, budgetSize, delta, dataset_info):
         self.cfg = cfg
         self.ds_name = self.cfg['DATASET']['NAME']
         self.seed = self.cfg['RNG_SEED']
-        self.embedding_path = embedding_path
-        # self.all_features = ds_utils.load_features(self.ds_name, self.seed)
-        self.all_features = ds_utils.load_embededing_from_path(embedding_path)
+        self.all_features = ds_utils.load_features(self.ds_name, self.seed)
         self.lSet = lSet
         self.uSet = uSet
         self.budgetSize = budgetSize
@@ -18,6 +16,15 @@ class ProbCover:
         self.relevant_indices = np.concatenate([self.lSet, self.uSet]).astype(int)
         self.rel_features = self.all_features[self.relevant_indices]
         self.graph_df = self.construct_graph()
+
+        self.dataset_info = dataset_info
+        self.indices_table = (self.dataset_info["frames"].cumsum() - self.dataset_info["frames"]).values # collect start index of each eye
+        self.indices_table = np.concatenate([self.indices_table, [self.dataset_info["frames"].sum()]]) # for last file
+        pe = np.zeros((self.all_features.shape[0], 1))
+        for start_idx, end_idx in zip(self.indices_table, self.indices_table[1:]):
+            pe[start_idx:end_idx, 0] = np.arange(end_idx - start_idx)
+        self.all_features = np.concatenate((self.all_features, pe), axis=1)
+
 
     def construct_graph(self, batch_size=500):
         """

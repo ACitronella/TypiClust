@@ -44,13 +44,12 @@ def kmeans(features, num_clusters):
         km.fit_predict(features)
     return km.labels_
 
-
-class TypiClust:
+class TypiClustIdxPE:
     MIN_CLUSTER_SIZE = 5
     MAX_NUM_CLUSTERS = 500
     K_NN = 20
 
-    def __init__(self, cfg, lSet, uSet, budgetSize, embedding_path, is_scan=False, dataset_info=None):
+    def __init__(self, cfg, lSet, uSet, budgetSize, is_scan=False, dataset_info=None):
         self.cfg = cfg
         self.ds_name = self.cfg['DATASET']['NAME']
         self.seed = self.cfg['RNG_SEED']
@@ -60,7 +59,8 @@ class TypiClust:
         self.uSet = uSet
         self.budgetSize = budgetSize
         self.dataset_info = dataset_info
-        self.embedding_path = embedding_path
+        self.indices_table = (self.dataset_info["frames"].cumsum() - self.dataset_info["frames"]).values # collect start index of each eye
+        self.indices_table = np.concatenate([self.indices_table, [self.dataset_info["frames"].sum()]]) # for last file
         self.init_features_and_clusters(is_scan)
         
 
@@ -68,7 +68,6 @@ class TypiClust:
         num_clusters = min(len(self.lSet) + self.budgetSize, self.MAX_NUM_CLUSTERS)
         print(f'Clustering into {num_clusters} clustering. Scan clustering: {is_scan}')
         if is_scan:
-            assert False, "not supported"
             fname_dict = {'CIFAR10': f'../../scan/results/cifar-10/scan/features_seed{self.seed}_clusters{num_clusters}.npy',
                           'CIFAR100': f'../../scan/results/cifar-100/scan/features_seed{self.seed}_clusters{num_clusters}.npy',
                           'TINYIMAGENET': f'../../scan/results/tiny-imagenet/scan/features_seed{self.seed}_clusters{num_clusters}.npy',
@@ -77,10 +76,13 @@ class TypiClust:
             self.features = np.load(fname)
             self.clusters = np.load(fname.replace('features', 'probs')).argmax(axis=-1)
         else:
-            # self.features = ds_utils.load_features(self.ds_name, self.seed)
-            self.features = ds_utils.load_embededing_from_path(self.embedding_path)
+            self.features = ds_utils.load_features(self.ds_name, self.seed) 
+            pe = np.zeros((self.features.shape[0], 1))
+            for start_idx, end_idx in zip(self.indices_table, self.indices_table[1:]):
+                pe[start_idx:end_idx, 0] = np.arange(end_idx - start_idx)
+            self.features = np.concatenate((self.features, pe), axis=1)
             self.clusters = kmeans(self.features, num_clusters=num_clusters)
-        print(f'Finished clustering into {num_clusters} clusters.')
+        print(f'Finished clustering into {num_clusters} clusters with positional encoding in index.')
 
     def select_samples(self):
         # using only labeled+unlabeled indices, without validation set.

@@ -3,13 +3,13 @@ import pandas as pd
 import torch
 import pycls.datasets.utils as ds_utils
 
-class ProbCover:
-    def __init__(self, cfg, lSet, uSet, budgetSize, delta, embedding_path):
+class ProbCoverIdxStandardDistDiv2:
+    def __init__(self, cfg, lSet, uSet, budgetSize, delta, embedding_path, dataset_info, frame_diff_factor):
         self.cfg = cfg
         self.ds_name = self.cfg['DATASET']['NAME']
         self.seed = self.cfg['RNG_SEED']
-        self.embedding_path = embedding_path
         # self.all_features = ds_utils.load_features(self.ds_name, self.seed)
+        self.embedding_path = embedding_path
         self.all_features = ds_utils.load_embededing_from_path(embedding_path)
         self.lSet = lSet
         self.uSet = uSet
@@ -17,6 +17,17 @@ class ProbCover:
         self.delta = delta
         self.relevant_indices = np.concatenate([self.lSet, self.uSet]).astype(int)
         self.rel_features = self.all_features[self.relevant_indices]
+        self.dataset_info = dataset_info
+
+        # since our all_feature is train, we use all of them
+        # self.frame_idx = torch.cat([torch.arange(frames, dtype=torch.float) for frames in dataset_info["frames"]]).unsqueeze(1)
+        self.frame_idx = [torch.arange(frames, dtype=torch.float) for frames in dataset_info["frames"]]
+        self.frame_idx = torch.cat([(f - f.mean()) / f.std() for f in self.frame_idx]).unsqueeze(1)
+        self.rel_frame_idx = self.frame_idx[self.relevant_indices]
+        self.frame_diff_factor = frame_diff_factor
+        assert len(self.frame_idx) == len(self.all_features) and len(self.rel_features) == len(self.rel_frame_idx)
+
+        # this must be the last thing to run
         self.graph_df = self.construct_graph()
 
     def construct_graph(self, batch_size=500):
@@ -31,10 +42,15 @@ class ProbCover:
         print(f'Start constructing graph using delta={self.delta}')
         # distance computations are done in GPU
         cuda_feats = torch.tensor(self.rel_features).cuda()
+        cuda_frame_idx = self.rel_frame_idx.cuda()
         for i in range(len(self.rel_features) // batch_size):
             # distance comparisons are done in batches to reduce memory consumption
             cur_feats = cuda_feats[i * batch_size: (i + 1) * batch_size]
+            cur_frame_idx = cuda_frame_idx[i * batch_size: (i + 1) * batch_size]
             dist = torch.cdist(cur_feats, cuda_feats)
+            frame_diff = self.frame_diff_factor*torch.cdist(cur_frame_idx, cuda_frame_idx, p=1)
+            print(torch.std_mean(dist), torch.std_mean(frame_diff))
+            dist = (dist + frame_diff) / 2
             mask = dist < self.delta
             # saving edges using indices list - saves memory.
             x, y = mask.nonzero().T

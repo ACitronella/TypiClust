@@ -25,6 +25,9 @@ class AugmentedDataset(Dataset):
             self.image_transform = transform
             self.augmentation_transform = transform
 
+    def __getattr__(self, n):
+        return getattr(self.dataset, n)
+
     def __len__(self):
         return len(self.dataset)
 
