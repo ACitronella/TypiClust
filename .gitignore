@@ -33,7 +33,9 @@ scratch*
 output/
 *.ipynb_checkpoints/
 data/
-scan/results/
+scan/results
+scan/images
+scan/datasets/*
 
 deep-al/*model_graveyard*
 deep-al/tools/log/
