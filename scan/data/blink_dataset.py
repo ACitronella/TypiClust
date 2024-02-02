@@ -144,6 +144,7 @@ class BlinkDataset2(Dataset):
         self.last_file_idx = -1
         self.x = None
         self.y = None
+        print("using Blink2")
 
     def __len__(self):
         return self.n
