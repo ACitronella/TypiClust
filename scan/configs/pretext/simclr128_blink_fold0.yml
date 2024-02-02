@@ -10,8 +10,8 @@ model_kwargs:
    pre_lasts_dim: 512
 
 # Dataset
-train_db_name: blink_fold0
-val_db_name: blink
+train_db_name: blink2_fold0
+val_db_name: blink2
 num_classes: 10
 fold_idx: 0
 

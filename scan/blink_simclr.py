@@ -75,7 +75,7 @@ def main():
         train_dataloader = get_train_dataloader(p, train_dataset)
     val_dataset = get_val_dataset(p, val_transforms)
      
-    val_dataloader = get_val_dataloader(p, val_dataset)
+    # val_dataloader = get_val_dataloader(p, val_dataset)
     print('Dataset contains {}/{} train/val samples'.format(len(train_dataset), len(val_dataset)))
 
     # Memory Bank

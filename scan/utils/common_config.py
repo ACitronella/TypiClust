@@ -220,7 +220,7 @@ def get_val_dataset(p, transform=None, to_neighbors_dataset=False):
         dataset = ImageNetSubset(subset_file=subset_file, split='val', transform=transform)
     elif "blink" in p['train_db_name']:
         from data.blink_dataset import BlinkDataset2
-        dataset = BlinkDataset2(train=False, transform=transform)
+        dataset = BlinkDataset2(train=False, transform=transform, fold_idx=p["fold_idx"])
     elif "blink" in p['train_db_name']:
         from data.blink_dataset import BlinkDataset
         dataset = BlinkDataset(train=False, transform=transform)
