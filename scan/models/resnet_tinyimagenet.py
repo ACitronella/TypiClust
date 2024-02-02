@@ -71,7 +71,7 @@ class Bottleneck(nn.Module):
 
 
 class ResNet(nn.Module):
-    def __init__(self, block, num_blocks, in_channel=3, zero_init_residual=False):
+    def __init__(self, block, num_blocks, in_channel=3, zero_init_residual=False, last_dim=512):
         super(ResNet, self).__init__()
         self.in_planes = 64
 
@@ -81,7 +81,7 @@ class ResNet(nn.Module):
         self.layer1 = self._make_layer(block, 64, num_blocks[0], stride=2)
         self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2)
         self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2)
-        self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2)
+        self.layer4 = self._make_layer(block, last_dim, num_blocks[3], stride=2)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
 
         for m in self.modules():
@@ -123,4 +123,5 @@ class ResNet(nn.Module):
 
 
 def resnet18(**kwargs):
-    return {'backbone': ResNet(BasicBlock, [2, 2, 2, 2], **kwargs), 'dim': 512}
+    last_dim = kwargs.setdefault("last_dim", 512)
+    return {'backbone': ResNet(BasicBlock, [2, 2, 2, 2], **kwargs), 'dim': last_dim}

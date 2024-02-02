@@ -36,7 +36,8 @@ def create_config(config_file_env, config_file_exp, seed, num_clusters=None):
     cfg['pretext_features'] = os.path.join(pretext_dir, f'features_seed{seed}.npy')
     cfg['topk_neighbors_train_path'] = os.path.join(pretext_dir, f'topk-train-neighbors_seed{seed}.npy')
     cfg['topk_neighbors_val_path'] = os.path.join(pretext_dir, f'topk-val-neighbors_seed{seed}.npy')
-
+    cfg['loss_plot_path'] = os.path.join(pretext_dir, f"loss_seed{seed}.png")
+    cfg.setdefault('use_batch_sampler', "use_sampler" in os.path.basename(config_file_exp)) # set iff "use_batch_sampler" is not a key in the cfg
     # If we perform clustering or self-labeling step we need additional paths.
     # We also include a run identifier to support multiple runs w/ same hyperparams.
     if cfg['setup'] in ['scan', 'selflabel']:

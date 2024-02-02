@@ -3,12 +3,13 @@ Authors: Wouter Van Gansbeke, Simon Vandenhende
 Licensed under the CC BY-NC 4.0 license (https://creativecommons.org/licenses/by-nc/4.0/)
 """
 import torch
+import torch.profiler
 import numpy as np
 from utils.utils import AverageMeter, ProgressMeter
 from byol_pytorch import BYOL
 
 
-def simclr_train(train_loader, model, criterion, optimizer, epoch):
+def simclr_train(train_loader, model, criterion, optimizer, epoch, is_byol):
     """ 
     Train according to the scheme from SimCLR
     https://arxiv.org/abs/2002.05709
@@ -19,10 +20,18 @@ def simclr_train(train_loader, model, criterion, optimizer, epoch):
         prefix="Epoch: [{}]".format(epoch))
 
     model.train()
-
+    # prof = torch.profiler.profile(
+    #     schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=1),
+    #     on_trace_ready=torch.profiler.tensorboard_trace_handler('./log/resnet18'),
+    #     record_shapes=True,
+    #     with_stack=True)
+    # prof.start()
     for i, batch in enumerate(train_loader):
+        # prof.step()
+        # if i >= 1 + 1 + 3:
+        #     break
         images = batch['image']
-        if isinstance(model, BYOL):
+        if is_byol:
             loss = model(images.cuda()) 
             model.update_moving_average()
         else:
@@ -43,6 +52,9 @@ def simclr_train(train_loader, model, criterion, optimizer, epoch):
 
         if i % 25 == 0:
             progress.display(i)
+    # prof.stop()
+    # exit(0)
+    return losses.avg
 
 def simclr_pe_train(train_loader, model, criterion, optimizer, epoch):
     """ 
@@ -82,6 +94,7 @@ def simclr_pe_train(train_loader, model, criterion, optimizer, epoch):
 
         if i % 25 == 0:
             progress.display(i)
+    return losses.avg
 
 
 def simclr_train_cpu(train_loader, model, criterion, optimizer, epoch):

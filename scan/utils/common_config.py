@@ -33,7 +33,8 @@ def get_criterion(p):
 def get_feature_dimensions_backbone(p):
     if p['backbone'] == 'resnet18':
         return 512
-
+    elif p['backbone'] == 'efficientnet-b0':
+        return 512
     elif p['backbone'] == 'resnet50':
         return 2048
 
@@ -43,6 +44,8 @@ def get_feature_dimensions_backbone(p):
 
 def get_model(p, pretrain_path=None):
     # Get backbone
+    assert 'blink' in p['train_db_name'] or (p['model_kwargs']['pre_lasts_dim'] == 512) or (p['model_kwargs']['pre_lasts_dim'] == 2048) or (p['model_kwargs']['pre_lasts_dim'] == 1280)
+
     if p['backbone'] == 'resnet18':
         if p['train_db_name'] in ['cifar-10', 'cifar-100']:
             from models.resnet_cifar import resnet18
@@ -57,8 +60,7 @@ def get_model(p, pretrain_path=None):
         elif 'blink' in p['train_db_name']:
             # from models.resnet_tinyimagenet_pe import resnet18
             from models.resnet_tinyimagenet import resnet18
-            backbone = resnet18()
-
+            backbone = resnet18(last_dim=p['model_kwargs']['pre_lasts_dim'])
         else:
             raise NotImplementedError
 
@@ -67,10 +69,13 @@ def get_model(p, pretrain_path=None):
             from models.resnet import resnet50
             backbone = resnet50()  
         elif 'blink' in p['train_db_name'] and p['setup'] == 'byol':
-            from torchvision import models
-            backbone = models.resnet50(pretrained=True)
+            from torchvision.models import resnet50
+            backbone = {"backbone": resnet50(pretrained=False), "dim": 2048}
         else:
             raise NotImplementedError 
+    elif p['backbone'] == "efficientnet-b0":
+        from torchvision.models import efficientnet_b0
+        backbone = {"backbone": efficientnet_b0(pretrained=False), "dim": 1280}
 
     else:
         raise ValueError('Invalid backbone {}'.format(p['backbone']))
@@ -90,8 +95,8 @@ def get_model(p, pretrain_path=None):
             assert(p['num_heads'] == 1)
         model = ClusteringModel(backbone, p['num_classes'], p['num_heads'])
     elif p['setup'] == 'byol':
-        from byol_pytorch import BYOL
-        model = BYOL(backbone, image_size=256, hidden_layer='avgpool') # default setting
+        from byol_pytorch import BYOL 
+        model = BYOL(backbone["backbone"], image_size=p["transformation_kwargs"]["crop_size"], hidden_layer='avgpool') # default setting
     else:
         raise ValueError('Invalid setup {}.'.format(p['setup']))
 
@@ -159,11 +164,6 @@ def get_train_dataset(p, transform, to_augmented_dataset=False,
         from data.imagenet import ImageNetSubset
         subset_file = './data/imagenet_subsets/%s.txt' %(p['train_db_name'])
         dataset = ImageNetSubset(subset_file=subset_file, split='train', transform=transform)
-    elif "blink2" in p["train_db_name"]:
-        # support 5 folds validation
-        from data.blink_dataset import BlinkDataset2
-        dataset = BlinkDataset2(train=True, transform=transform, fold_idx=p["fold_idx"])
-        blink_indices_table = dataset.indices_table
     elif "blink" in p['train_db_name']:
         from data.blink_dataset import BlinkDataset
         dataset = BlinkDataset(train=True, transform=transform, fold_idx=p["fold_idx"])
@@ -215,7 +215,6 @@ def get_val_dataset(p, transform=None, to_neighbors_dataset=False):
     elif "blink" in p['train_db_name']:
         from data.blink_dataset import BlinkDataset
         dataset = BlinkDataset(train=False, transform=transform)
-
     else:
         raise ValueError('Invalid validation dataset {}'.format(p['val_db_name']))
     
@@ -229,7 +228,6 @@ def get_val_dataset(p, transform=None, to_neighbors_dataset=False):
 import copy
 class BlinkSampler(torch.utils.data.Sampler):
     def __init__(self, indices_table):
-        # self.rng = np.random.default_rng()
         indices_table = np.asarray(indices_table)
         self.start_end_idx = np.asarray((indices_table[:-1], indices_table[1:])).T
         self.max_frames = np.amax(self.start_end_idx[:, 1] - self.start_end_idx[:, 0])
@@ -239,25 +237,39 @@ class BlinkSampler(torch.utils.data.Sampler):
         for start_idx, end_idx in self.start_end_idx:
             available_idx = np.concatenate((
                 np.arange(start_idx, end_idx), 
-                self.rng.integers(start_idx, end_idx, size=self.max_frames - (end_idx - start_idx))) ) 
+                self.rng.integers(start_idx, end_idx, size=self.max_frames - (end_idx - start_idx))) ) # oversample
             self.available_patient_idx.append(available_idx)
+
+
+        # tmp = np.concatenate(self.available_patient_idx)
+        # assert len(tmp) == self.n and len(set(tmp)) == indices_table[-1]
+        
+        # print(len(self.available_patient_idx))
+        # print(indices_table)
 
     def __iter__(self):
         available_patient_idx = copy.deepcopy(self.available_patient_idx)
+        n_available_patient = len(available_patient_idx)
         for idx in range(len(available_patient_idx)):
             self.rng.shuffle(available_patient_idx[idx])
-        while all([len(l) != 0 for l in available_patient_idx]):
-            for p_idx in range(len(available_patient_idx)):
-                yield available_patient_idx[p_idx][0]
-                available_patient_idx[p_idx] = available_patient_idx[p_idx][1:]
- 
+        for frame_idx in range(self.max_frames):
+            for p_idx in range(n_available_patient):
+                # print(available_patient_idx[p_idx][frame_idx], end=" ")
+                yield available_patient_idx[p_idx][frame_idx]
+            # print()
     def __len__(self):
         return self.n
 
 def get_train_dataloader(p, dataset, sampler=None):
+    if p['batch_size'] == "npatient":
+        batch_size = dataset.dataset_info.shape[0]
+        return torch.utils.data.DataLoader(dataset, num_workers=p['num_workers'], 
+                batch_size=batch_size, pin_memory=True, collate_fn=collate_custom,
+                drop_last=True, shuffle=sampler is None, sampler=sampler)
+    
     return torch.utils.data.DataLoader(dataset, num_workers=p['num_workers'], 
             batch_size=p['batch_size'], pin_memory=True, collate_fn=collate_custom,
-            drop_last=True, shuffle=sampler is None, prefetch_factor=1, sampler=sampler)
+            drop_last=True, shuffle=sampler is None, sampler=sampler)
     # return torch.utils.data.DataLoader(dataset, num_workers=p['num_workers'], 
     #         batch_size=p['batch_size'], pin_memory=True, collate_fn=collate_custom,
     #         drop_last=True, shuffle=False)
@@ -265,7 +277,7 @@ def get_train_dataloader(p, dataset, sampler=None):
 
 def get_val_dataloader(p, dataset):
     return torch.utils.data.DataLoader(dataset, num_workers=p['num_workers'],
-            batch_size=p['batch_size'], pin_memory=True, collate_fn=collate_custom,
+            batch_size=p['batch_size'] if isinstance(p['batch_size'], int) else 64, pin_memory=True, collate_fn=collate_custom,
             drop_last=False, shuffle=False)
 
 
@@ -291,7 +303,30 @@ def get_train_transformations(p):
             transforms.ToTensor(),
             transforms.Normalize(**p['augmentation_kwargs']['normalize'])
         ])
-    
+    elif p['augmentation_strategy'] == 'reduced_simclr':
+        return transforms.Compose([
+            transforms.RandomResizedCrop(**p['augmentation_kwargs']['random_resized_crop']),
+            transforms.RandomHorizontalFlip(),
+            # transforms.RandomApply([
+            #     transforms.ColorJitter(**p['augmentation_kwargs']['color_jitter'])
+            # ], p=p['augmentation_kwargs']['color_jitter_random_apply']['p']),
+            # transforms.RandomGrayscale(**p['augmentation_kwargs']['random_grayscale']),
+            transforms.ToTensor(),
+            transforms.Normalize(**p['augmentation_kwargs']['normalize'])
+        ])
+    elif p['augmentation_strategy'] == 'simclr_wo_flip':
+        return transforms.Compose([
+            transforms.RandomResizedCrop(**p['augmentation_kwargs']['random_resized_crop']),
+            # transforms.RandomHorizontalFlip(),
+            transforms.RandomApply([
+                transforms.ColorJitter(**p['augmentation_kwargs']['color_jitter'])
+            ], p=p['augmentation_kwargs']['color_jitter_random_apply']['p']),
+            transforms.RandomGrayscale(**p['augmentation_kwargs']['random_grayscale']),
+            transforms.ToTensor(),
+            transforms.Normalize(**p['augmentation_kwargs']['normalize'])
+        ])
+
+
     elif p['augmentation_strategy'] == 'ours':
         # Augmentation strategy from our paper 
         return transforms.Compose([
@@ -311,11 +346,16 @@ def get_train_transformations(p):
 
 
 def get_val_transformations(p):
-    return transforms.Compose([
+    if p["transformation_kwargs"].get("normalize", None):
+        return transforms.Compose([
+                transforms.CenterCrop(p['transformation_kwargs']['crop_size']),
+                transforms.ToTensor(),  
+                transforms.Normalize(**p['transformation_kwargs']['normalize'])])
+    else:
+        return transforms.Compose([
             transforms.CenterCrop(p['transformation_kwargs']['crop_size']),
-            transforms.ToTensor(), 
-            transforms.Normalize(**p['transformation_kwargs']['normalize'])])
-
+            transforms.ToTensor()
+        ])
 
 def get_optimizer(p, model, cluster_head_only=False):
     if cluster_head_only: # Only weights in the cluster head will be updated 

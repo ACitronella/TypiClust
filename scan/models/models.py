@@ -5,10 +5,10 @@ Licensed under the CC BY-NC 4.0 license (https://creativecommons.org/licenses/by
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+import math
 
 class ContrastiveModel(nn.Module):
-    def __init__(self, backbone, head='mlp', features_dim=128):
+    def __init__(self, backbone, head='mlp', features_dim=128, **kwargs):
         super(ContrastiveModel, self).__init__()
         self.backbone = backbone['backbone']
         self.backbone_dim = backbone['dim']
@@ -57,12 +57,12 @@ class PositionalEncoding(nn.Module):
 
 
 class ContrastiveModelPE(nn.Module):
-    def __init__(self, backbone, head='mlp', features_dim=128):
+    def __init__(self, backbone, head='mlp', features_dim=128, **kwargs):
         super(ContrastiveModelPE, self).__init__()
         self.backbone = backbone['backbone']
         self.backbone_dim = backbone['dim']
         self.head = head
-        self.pe = PositionalEncoding(512)
+        self.pe = PositionalEncoding(self.backbone_dim)
  
         if head == 'linear':
             self.contrastive_head = nn.Linear(self.backbone_dim, features_dim)

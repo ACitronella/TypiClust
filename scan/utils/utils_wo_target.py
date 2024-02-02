@@ -7,6 +7,7 @@ import torch
 import numpy as np
 import errno
 from byol_pytorch import BYOL
+import matplotlib.pyplot as plt
 
 def mkdir_if_missing(directory):
     if not os.path.exists(directory):
@@ -114,3 +115,19 @@ def confusion_matrix(predictions, gt, class_names, output_file=None):
     else:
         plt.savefig(output_file, dpi=300, bbox_inches='tight')
     plt.close()
+
+
+def plot_metrics(metrics: dict, title:str="loss", show=True, save_path=None):
+    # `losses` and `ious` are dict that has key as label of the plot, and values as list of loss/iou values
+    n_epoch = np.amin([len(l) for l in metrics.values()])
+    epochs = range(1, n_epoch+1)
+    plt.title(title)
+    for legend, metric_values in metrics.items():
+        plt.plot(epochs, metric_values, "-o", label=legend, alpha=0.4)
+    plt.legend()
+    plt.grid()
+    if save_path:
+        plt.savefig(save_path)
+    if show:
+        plt.show()
+        plt.close("all")
