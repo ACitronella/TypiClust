@@ -35,7 +35,10 @@ output/
 data/
 scan/results
 scan/images
-scan/datasets/*
+scan/datasets
 
 deep-al/*model_graveyard*
 deep-al/tools/log/
+
+zip_archive
+.vscode
