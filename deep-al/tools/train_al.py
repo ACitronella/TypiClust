@@ -43,6 +43,7 @@ import pycls.utils.metrics as mu
 import pycls.utils.net as nu
 from pycls.utils.meters import TestMeter, TrainMeter, ValMeter
 from pycls.datasets.blink_dataset import BlinkDataset, ImageDataFrameBlinkingWrapper
+from pycls.datasets.blink_dataset_with_no_test_set import BlinkDataset2
 
 logger = lu.get_logger(__name__)
 # model params
@@ -764,7 +765,7 @@ def main(cfg):
     # model = model_builder.build_model(cfg).cuda()
     
     all_sampled_set = []
-    if isinstance(train_data, BlinkDataset):
+    if isinstance(train_data, (BlinkDataset, BlinkDataset2)):
         dataset_info = train_data.dataset_info
     elif isinstance(train_data, ImageDataFrameBlinkingWrapper):
         dataset_info = train_data.dataset.dataset_info

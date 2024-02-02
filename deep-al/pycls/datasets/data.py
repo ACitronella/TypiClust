@@ -5,7 +5,7 @@
 import torch
 import numpy as np
 
-from torch.utils.data import DataLoader
+# from torch.utils.data import DataLoader
 from torchvision import transforms
 from torch.utils.data.sampler import SubsetRandomSampler
 
@@ -17,6 +17,7 @@ from pycls.datasets.imbalanced_cifar import IMBALANCECIFAR10, IMBALANCECIFAR100
 from pycls.datasets.sampler import IndexedSequentialSampler
 from pycls.datasets.tiny_imagenet import TinyImageNet
 from pycls.datasets.blink_dataset import BlinkDataset, ImageDataFrameBlinkingWrapper
+from pycls.datasets.blink_dataset_with_no_test_set import BlinkDataset2
 logger = lu.get_logger(__name__)
 
 class _RepeatSampler(object):
@@ -258,10 +259,16 @@ class Data:
         elif self.dataset ==  'IMBALANCED_CIFAR100':
             im_cifar100 = IMBALANCECIFAR100(save_dir, train=isTrain, transform=preprocess_steps, test_transform=test_preprocess_steps)
             return im_cifar100, len(im_cifar100)
+        elif "blink2" in self.dataset:
+            is_blinking = kwargs.get('is_blinking')
+            im_blink = BlinkDataset2(dataset_path=save_dir, train=isTrain, transform=preprocess_steps, test_transform=test_preprocess_steps, fold_idx=fold_idx, use_faster=is_blinking is None)
+            if is_blinking is not None:
+                im_blink = ImageDataFrameBlinkingWrapper(im_blink, is_blinking=is_blinking)
+            return im_blink, len(im_blink)
         elif "blink" in self.dataset:
-            is_blinking = kwargs['is_blinking']
+            is_blinking = kwargs.get('is_blinking')
             im_blink = BlinkDataset(dataset_path=save_dir, train=isTrain, transform=preprocess_steps, test_transform=test_preprocess_steps, fold_idx=fold_idx, use_faster=is_blinking is None)
-            if isinstance(kwargs["is_blinking"], bool):
+            if is_blinking is not None:
                 im_blink = ImageDataFrameBlinkingWrapper(im_blink, is_blinking=is_blinking)
             return im_blink, len(im_blink)
 
