@@ -159,6 +159,11 @@ def get_train_dataset(p, transform, to_augmented_dataset=False,
         from data.imagenet import ImageNetSubset
         subset_file = './data/imagenet_subsets/%s.txt' %(p['train_db_name'])
         dataset = ImageNetSubset(subset_file=subset_file, split='train', transform=transform)
+    elif "blink2" in p["train_db_name"]:
+        # support 5 folds validation
+        from data.blink_dataset import BlinkDataset2
+        dataset = BlinkDataset2(train=True, transform=transform, fold_idx=p["fold_idx"])
+        blink_indices_table = dataset.indices_table
     elif "blink" in p['train_db_name']:
         from data.blink_dataset import BlinkDataset
         dataset = BlinkDataset(train=True, transform=transform, fold_idx=p["fold_idx"])
