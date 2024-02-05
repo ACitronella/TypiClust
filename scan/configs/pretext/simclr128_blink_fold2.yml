@@ -9,7 +9,7 @@ model_kwargs:
 
 # Dataset
 train_db_name: blink2_fold2
-val_db_name: blink
+val_db_name: blink2
 num_classes: 10
 fold_idx: 2
 
@@ -25,7 +25,7 @@ optimizer_kwargs:
    nesterov: False
    weight_decay: 0.0001 
    momentum: 0.9
-   lr: 0.4
+   lr: 0.04
 scheduler: cosine
 scheduler_kwargs:
    lr_decay_rate: 0.1
