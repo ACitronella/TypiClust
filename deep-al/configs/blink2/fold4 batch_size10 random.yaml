@@ -2,7 +2,7 @@
 EXP_NAME: 'random_sample'
 RNG_SEED: 36
 DATASET:
-  NAME: blink_fold4 # or CIFAR100, MNIST, SVHN, TinyImageNet
+  NAME: blink2_fold4 # or CIFAR100, MNIST, SVHN, TinyImageNet
   FOLD_IDX: 4
   ROOT_DIR: '../../pytorchlm/' # Relative path where data should be downloaded
   # Specifies the proportion of data in train set that should be considered as the validation data

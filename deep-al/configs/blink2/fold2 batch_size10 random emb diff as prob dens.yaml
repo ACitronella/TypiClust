@@ -2,7 +2,7 @@
 EXP_NAME: 'simclr128_random-on-emb-diff-as-prob-dens-batchsize10'
 RNG_SEED: 34
 DATASET:
-  NAME: blink_fold2 # or CIFAR100, MNIST, SVHN, TinyImageNet
+  NAME: blink2_fold2 # or CIFAR100, MNIST, SVHN, TinyImageNet
   FOLD_IDX: 2
   ROOT_DIR: '../../pytorchlm/' # Relative path where data should be downloaded
   # Specifies the proportion of data in train set that should be considered as the validation data
