@@ -130,7 +130,7 @@ class BlinkDataset2(Dataset):
         info_df["fold_idx"] = info_df["fold_idx"].astype(int)
         FOLDS = 5
         if train:
-            self.dataset_info = info_df[(info_df["fold_idx"] != fold_idx) & (info_df['fold_idx'] != fold_idx%FOLDS)]
+            self.dataset_info = info_df[(info_df["fold_idx"] != fold_idx) & (info_df['fold_idx'] != (fold_idx+1)%FOLDS)]
         else: # val, leave (fold_idx+1)%FOLDS as test set
             self.dataset_info = info_df[info_df["fold_idx"] == fold_idx]
         self.dataset_info = self.dataset_info.reset_index(drop=True)
