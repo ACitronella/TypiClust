@@ -281,7 +281,11 @@ def train_model_pip(net, train_loader, criterion_cls, criterion_reg, cls_loss_we
         epoch_loss = epoch_mse = epoch_mse_nb = 0.0 # epoch_nme = epoch_nme_nb =
         count_img = 0
         start_train_time = perf_counter()
-        for inputs, labels_map, labels_x, labels_y, labels_nb_x, labels_nb_y in train_loader:
+        # prof.start()
+        for idx, (inputs, labels_map, labels_x, labels_y, labels_nb_x, labels_nb_y) in enumerate(train_loader):
+            # prof.step()
+            # if idx >= 1 + 1 + 3 + 1:
+            #     break
             inputs = inputs.to(device); labels_map = labels_map.to(device);
             labels_x = labels_x.to(device); labels_y = labels_y.to(device);
             labels_nb_x = labels_nb_x.to(device); labels_nb_y = labels_nb_y.to(device)
@@ -300,6 +304,8 @@ def train_model_pip(net, train_loader, criterion_cls, criterion_reg, cls_loss_we
                 epoch_mse_nb += torch.nn.functional.mse_loss(lms_gts, lms_pred_merges, reduction='none').mean(dim=1).sum()
                 count_img += lms_gts.shape[0]
                 epoch_loss += loss
+        # prof.stop()
+        # exit(0)
         epoch_loss /= len(train_loader)
         # epoch_nme /= count_img
         # epoch_nme_nb /= count_img
@@ -870,7 +876,7 @@ def main(cfg):
     imshow_kp(img, lms_pred=kp)
     plt.savefig(os.path.join(MODEL_GRAVEYARD, "assert-val.png"), bbox_inches='tight')
 
-    train_dataloader_wrapper = functools.partial(DataLoader, batch_size=cfg.TRAIN.BATCH_SIZE, num_workers=0, shuffle=True, pin_memory=False)
+    train_dataloader_wrapper = functools.partial(DataLoader, batch_size=cfg.TRAIN.BATCH_SIZE, num_workers=8, shuffle=True, pin_memory=False)
     val_dataloader_wrapper = functools.partial(DataLoader, batch_size=512, num_workers=0, shuffle=False, pin_memory=False)
     lSet_loader = train_dataloader_wrapper(train_dataset)
     valSet_loader = val_dataloader_wrapper(val_dataset)
@@ -945,6 +951,8 @@ def main(cfg):
 
         if not skip_training:
             meanface, meanface_indices, reverse_index1, reverse_index2, max_len = cal_and_process_meanface([train_data[idx] for idx in lSet], num_lms, num_nb)
+            reverse_index1 = torch.tensor(reverse_index1, dtype=torch.long).to(device)
+            reverse_index2 = torch.tensor(reverse_index2, dtype=torch.long).to(device)
         train_dataset = CustomImageDataset4(train_data, input_size, num_lms, net_stride, meanface_indices, train_transforms,
                                             pil_augment=pil_augment, allow_idxs=lSet)
         val_dataset = CustomImageDataset4(val_data, input_size, num_lms, net_stride, meanface_indices, val_transforms,
