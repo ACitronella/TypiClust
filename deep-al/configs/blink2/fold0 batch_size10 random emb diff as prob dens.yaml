@@ -23,7 +23,7 @@ ACTIVE_LEARNING:
   MAX_ITER: 10 # Max AL episodes
   FINE_TUNE: False
   INIT_L_RATIO: 0. # init labeled set
-  EMBEDDING_PATH: "../../scan/results/blink_fold0/pretext/features_seed32.npy" # used by typiclust and probcover
+  EMBEDDING_PATH: "../../scan/results/blink2_fold0/pretext/features_seed132.npy" # used by typiclust and probcover
 OPTIM: # unused for now
   TYPE: 'sgd' # or 'adam'
   BASE_LR: 0.1
