@@ -127,7 +127,8 @@ for fold_idx in range(4):
     print(f"fold {fold_idx}")
     npatient = (train_val_df["fold_idx"] != fold_idx).sum()
     nclasses = 5
-    features = ds_utils.load_features(f"blink_fold{fold_idx}", seed=2, train=True)
+    # features = ds_utils.load_features(f"blink2_fold{fold_idx}", seed=132, train=True)
+    features = np.load(f"../../scan/results/blink2_fold{fold_idx}/pretext/features_seed132.npy")
     km = KMeans(nclasses)
     predict = km.fit_predict(features)
     purity_each_delta = []
