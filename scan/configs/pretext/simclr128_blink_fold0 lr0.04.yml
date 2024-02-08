@@ -1,5 +1,6 @@
 # Setup
 setup: simclr
+# simclr_pe
 
 # Model
 backbone: resnet18
@@ -9,10 +10,10 @@ model_kwargs:
    pre_lasts_dim: 512
 
 # Dataset
-train_db_name: blink2_fold1
+train_db_name: blink2_fold0
 val_db_name: blink2
 num_classes: 10
-fold_idx: 1
+fold_idx: 0
 
 # Loss
 criterion: simclr
