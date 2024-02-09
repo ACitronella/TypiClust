@@ -20,7 +20,6 @@ def create_config(config_file_env, config_file_exp, seed, num_clusters=None):
         config['num_classes'] = num_clusters
 
     cfg = EasyDict()
-   
     # Copy
     for k, v in config.items():
         cfg[k] = v
@@ -28,12 +27,13 @@ def create_config(config_file_env, config_file_exp, seed, num_clusters=None):
     # Set paths for pretext task (These directories are needed in every stage)
     base_dir = os.path.join(root_dir, cfg['train_db_name'])
     pretext_dir = os.path.join(base_dir, 'pretext')
+    config_file_exp_name = os.path.basename(config_file_exp).split(".")[0]
     mkdir_if_missing(base_dir)
     mkdir_if_missing(pretext_dir)
     cfg['pretext_dir'] = pretext_dir
     cfg['pretext_checkpoint'] = os.path.join(pretext_dir, f'checkpoint_seed{seed}.pth.tar')
     cfg['pretext_model'] = os.path.join(pretext_dir, f'model_seed{seed}.pth.tar')
-    cfg['pretext_features'] = os.path.join(pretext_dir, f'features_seed{seed}.npy')
+    cfg['pretext_features'] = os.path.join(pretext_dir, f'features_seed{seed}_{config_file_exp_name}.npy')
     cfg['topk_neighbors_train_path'] = os.path.join(pretext_dir, f'topk-train-neighbors_seed{seed}.npy')
     cfg['topk_neighbors_val_path'] = os.path.join(pretext_dir, f'topk-val-neighbors_seed{seed}.npy')
     cfg['loss_plot_path'] = os.path.join(pretext_dir, f"loss_seed{seed}.png")
