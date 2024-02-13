@@ -1,5 +1,5 @@
 # Folder name where best model logs etc are saved. "auto" creates a timestamp based folder
-EXP_NAME: 'random_sample_fine_tune'
+EXP_NAME: 'random_sample_finetune'
 RNG_SEED: 35
 DATASET:
   NAME: blink2_fold3 # or CIFAR100, MNIST, SVHN, TinyImageNet
