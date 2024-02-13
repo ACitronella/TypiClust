@@ -982,8 +982,9 @@ def main(cfg):
             model.load_state_dict(init_model_state_dict); model.train()
             model = model.to(device)
 
-            optimizer = optim.Adam(model.parameters(), lr=init_lr)
-            scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=lr_decay_steps, gamma=lr_decay_factor)
+        optimizer = optim.Adam(model.parameters(), lr=init_lr)
+        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=lr_decay_steps, gamma=lr_decay_factor)
+
         if training_losses is not None:
             plt.figure(figsize=(1000/100, 800/100), dpi=100)
             plt.subplot(3, 1, 1)
