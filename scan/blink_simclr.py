@@ -90,11 +90,11 @@ def main():
                                 p['num_classes'], p['criterion_kwargs']['temperature'], 
                                 p['model_kwargs']['pre_lasts_dim'])
     memory_bank_base.cuda()
-    memory_bank_val = MemoryBank(len(val_dataset),
-                                p['model_kwargs']['features_dim'],
-                                p['num_classes'], p['criterion_kwargs']['temperature'],
-                                p['model_kwargs']['pre_lasts_dim'])
-    memory_bank_val.cuda()
+    # memory_bank_val = MemoryBank(len(val_dataset),
+    #                             p['model_kwargs']['features_dim'],
+    #                             p['num_classes'], p['criterion_kwargs']['temperature'],
+    #                             p['model_kwargs']['pre_lasts_dim'])
+    # memory_bank_val.cuda()
 
     # Criterion
     print(colored('Retrieve criterion', 'blue'))
