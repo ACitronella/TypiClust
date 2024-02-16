@@ -1,0 +1,71 @@
+# Folder name where best model logs etc are saved. "auto" creates a timestamp based folder
+EXP_NAME: 'simclr128-lr0.04-temp0.01_emb-diff-as-prob-dens-reduce-high-frame-finetune-batchsize10'
+RNG_SEED: 32
+DATASET:
+  NAME: blink2_fold0 # or CIFAR100, MNIST, SVHN, TinyImageNet
+  FOLD_IDX: 0
+  ROOT_DIR: '../../pytorchlm/' # Relative path where data should be downloaded
+  # Specifies the proportion of data in train set that should be considered as the validation data
+  VAL_RATIO: 0.1 # unused
+  # Data augmentation methods - 'simclr', 'randaug', 'horizontalflip'
+  # AUG_METHOD: 'horizontalflip' 
+MODEL:
+  # Model type. 
+  # Choose from vgg style ['vgg11', 'vgg11_bn', 'vgg13', 'vgg13_bn', 'vgg16', 'vgg16_bn', 'vgg19_bn', 'vgg19',]
+  # or from resnet style ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152', 'resnext50_32x4d', 'resnext101_32x8d', 
+  # 'wide_resnet50_2', 'wide_resnet101_2']
+  TYPE: resnet18
+  NUM_CLASSES: 10
+ACTIVE_LEARNING:
+  BUDGET_SIZE: 10 # Active sampling budget (at each episode)
+  SAMPLING_FN: 'embedding_difference_as_probability_density_reduce_high_frame_prob' # Active sampling method
+  MAX_ITER: 10 # Max AL episodes
+  EMBEDDING_PATH: "../../scan/results/blink2_fold0/pretext/features_seed133_lr0.04_temp0.01.npy" # used by typiclust and probcover
+  FINE_TUNE: True
+  INIT_L_RATIO: 0. # init labeled set
+OPTIM: # unused for now
+  TYPE: 'sgd' # or 'adam'
+  BASE_LR: 0.1
+  # Learning rate policy select from {'cos', 'exp', 'steps'}
+  LR_POLICY: steps
+  # Steps for 'steps' policy (in epochs)
+  STEPS: [0] #[0, 30, 60, 90]
+  # Training Epochs
+  MAX_EPOCH: 1
+  # Momentum
+  MOMENTUM: 0.9
+  # Nesterov Momentum
+  NESTEROV: False
+  # L2 regularization
+  WEIGHT_DECAY: 0.0005
+  # Exponential decay factor
+  GAMMA: 0.1
+TRAIN:
+  SPLIT: train
+  # Training mini-batch size
+  BATCH_SIZE: 10
+  # Image size
+  IM_SIZE: 256
+  IM_CHANNELS: 3
+  # Evaluate model on test data every eval period epochs
+  # EVAL_PERIOD: 1 
+  NUM_EPOCHS: 40
+TEST:
+  SPLIT: test
+  # Testing mini-batch size
+  BATCH_SIZE: 256
+  # Image size
+  IM_SIZE: 256
+  # Saved model to use for testing (useful when running tools/test_model.py)
+  MODEL_PATH: ''
+DATA_LOADER:
+  NUM_WORKERS: 8
+CUDNN:
+  BENCHMARK: True
+
+
+  # DROPOUT_ITERATIONS: 10 # Used by DBAL
+# Useful when running `tools/ensemble_al.py` or `tools/ensemble_train.py`
+ENSEMBLE: 
+  NUM_MODELS: 3
+  MODEL_TYPE: ['resnet18']
