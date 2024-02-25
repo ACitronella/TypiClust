@@ -180,7 +180,14 @@ class ActiveLearning:
             al = EmbeddingDifferenceAsProbabilityDensityReduceHighFrameProb(self.cfg, lSet, uSet, self.cfg.ACTIVE_LEARNING.BUDGET_SIZE,
                                                          self.cfg.ACTIVE_LEARNING.EMBEDDING_PATH, dataset_info, kernel_size=11)
             activeSet, uSet = al.select_samples()
-            
+        elif self.cfg.ACTIVE_LEARNING.SAMPLING_FN == "embedding_difference_as_probability_density_with_softmax":
+            from .embedding_difference_as_probability_density_with_softmax import EmbeddingDifferenceAsProbabilityDensityWithSoftmax
+            dataset_info = kwargs["dataset_info"]
+            temperature = self.cfg.ACTIVE_LEARNING.SOFTMAX_TEMPERATURE
+            al = EmbeddingDifferenceAsProbabilityDensityWithSoftmax(self.cfg, lSet, uSet, self.cfg.ACTIVE_LEARNING.BUDGET_SIZE,
+                                                         self.cfg.ACTIVE_LEARNING.EMBEDDING_PATH, dataset_info, kernel_size=11, temperature=temperature)
+            activeSet, uSet = al.select_samples()
+               
         elif self.cfg.ACTIVE_LEARNING.SAMPLING_FN == "dbal" or self.cfg.ACTIVE_LEARNING.SAMPLING_FN == "DBAL":
             activeSet, uSet = self.sampler.dbal(budgetSize=self.cfg.ACTIVE_LEARNING.BUDGET_SIZE, \
                 uSet=uSet, clf_model=clf_model,dataset=trainDataset)
