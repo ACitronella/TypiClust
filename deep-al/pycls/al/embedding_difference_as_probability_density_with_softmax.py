@@ -36,6 +36,7 @@ class EmbeddingDifferenceAsProbabilityDensityWithSoftmax:
             smoothed_mean_square_diff_em[-kernel_size//2+1:] = smoothed_mean_square_diff_em[-kernel_size//2+1]
             v.append(smoothed_mean_square_diff_em)
         v = np.concatenate(v)[self.uSet]
+        v = v.astype("float64")
         v = torch.softmax(torch.from_numpy(v)/temperature, dim=0).numpy()
         w = (v - v.min())
         y = w / w.max()
