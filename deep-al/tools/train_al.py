@@ -13,7 +13,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional
 import torch.nn as nn
-import torch.optim as optim
+# import torch.optim as optim
 import torch.profiler
 import torchvision.transforms as transforms
 from PIL import Image, ImageEnhance, ImageFilter
@@ -35,7 +35,7 @@ from pycls.al.ActiveLearning import ActiveLearning
 import pycls.core.builders as model_builder
 from pycls.core.config import cfg, dump_cfg
 # import pycls.core.losses as losses
-# import pycls.core.optimizer as optim
+import pycls.core.optimizer as optim
 from pycls.datasets.data import Data
 import pycls.utils.checkpoint as cu
 import pycls.utils.logging as lu
@@ -730,7 +730,7 @@ def main(cfg):
     print(exp_dir)
     if not os.path.exists(exp_dir):
         os.makedirs(exp_dir)
-        print("Experiment Directory is {}.\n".format(exp_dir))
+        print(" Directory is {}.\n".format(exp_dir))
     else:
         assert False, "please explicitly delete the experiment result by yourself"
         print("Experiment Directory Already Exists: {}. Reusing it may lead to loss of old logs in the directory.\n".format(exp_dir))
@@ -808,12 +808,12 @@ def main(cfg):
     # logger.info("model: {}\n".format(cfg.MODEL.TYPE))
 
     # # Construct the optimizer
-    # optimizer = optim.construct_optimizer(cfg, model)
-    # opt_init_state = deepcopy(optimizer.state_dict())
+    optimizer = optim.construct_optimizer(cfg, model)
+    opt_init_state = deepcopy(optimizer.state_dict())
     # model_init_state = deepcopy(model.state_dict().copy())
 
-    # # print("optimizer: {}\n".format(optimizer))
-    # logger.info("optimizer: {}\n".format(optimizer))
+    print("optimizer: {}\n".format(optimizer))
+    logger.info("optimizer: {}\n".format(optimizer))
 
     print("AL Query Method: {}\nMax AL Episodes: {}\n".format(cfg.ACTIVE_LEARNING.SAMPLING_FN, cfg.ACTIVE_LEARNING.MAX_ITER))
     logger.info("AL Query Method: {}\nMax AL Episodes: {}\n".format(cfg.ACTIVE_LEARNING.SAMPLING_FN, cfg.ACTIVE_LEARNING.MAX_ITER))
@@ -822,16 +822,16 @@ def main(cfg):
     n_epochs = cfg.TRAIN.NUM_EPOCHS
     cls_loss_weight = 10
     reg_loss_weight = 1
-    init_lr = 0.001
-    lr_decay_steps = [30, 50]
-    lr_decay_factor = 0.1
+    # init_lr = 0.001
+    # lr_decay_steps = [30, 50]
+    # lr_decay_factor = 0.1
     pil_augment = True
     # BATCH_SIZE = batch_size = 32
     criterion_cls = nn.MSELoss()
     criterion_reg = nn.L1Loss()
-    optimizer = optim.Adam(model.parameters(), lr=init_lr)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=lr_decay_steps, gamma=lr_decay_factor)
-    # scheduler = None
+    # optimizer = optim.Adam(model.parameters(), lr=init_lr)
+    # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=lr_decay_steps, gamma=lr_decay_factor)
+    scheduler = None
     metrics = {}
     training_losses = metrics.setdefault("training_losses", [])
     validation_losses = metrics.setdefault("validation_losses", [])
@@ -978,13 +978,14 @@ def main(cfg):
             # # Construct the optimizer
             # optimizer = optim.construct_optimizer(cfg, model)
             # print(model.load_state_dict(model_init_state))
-            # print(optimizer.load_state_dict(opt_init_state))
             # model = model_builder.get_keypoint_model(num_nb, num_lms, input_size, net_stride).to(device)
             model.load_state_dict(init_model_state_dict); model.train()
             model = model.to(device)
 
-        optimizer = optim.Adam(model.parameters(), lr=init_lr)
-        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=lr_decay_steps, gamma=lr_decay_factor)
+        # optimizer = optim.Adam(model.parameters(), lr=init_lr)
+        # scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=lr_decay_steps, gamma=lr_decay_factor)
+        optimizer.load_state_dict(opt_init_state)
+
 
         if training_losses is not None:
             plt.figure(figsize=(1000/100, 800/100), dpi=100)
