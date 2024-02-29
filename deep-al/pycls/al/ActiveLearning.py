@@ -13,10 +13,12 @@ class ActiveLearning:
     Implements standard active learning methods.
     """
 
-    def __init__(self, dataObj, cfg):
+    def __init__(self, dataObj, cfg, cur_episode, dataset_info):
         self.dataObj = dataObj
         self.sampler = Sampling(dataObj=dataObj,cfg=cfg)
         self.cfg = cfg
+        self.cur_episode = cur_episode
+        self.dataset_info = dataset_info
         
     def sample_from_uSet(self, clf_model, lSet, uSet, trainDataset, supportingModels=None, **kwargs):
         """
@@ -187,7 +189,21 @@ class ActiveLearning:
             al = EmbeddingDifferenceAsProbabilityDensityWithSoftmax(self.cfg, lSet, uSet, self.cfg.ACTIVE_LEARNING.BUDGET_SIZE,
                                                          self.cfg.ACTIVE_LEARNING.EMBEDDING_PATH, dataset_info, kernel_size=11, temperature=temperature)
             activeSet, uSet = al.select_samples()
-               
+        elif self.cfg.ACTIVE_LEARNING.SAMPLING_FN == "probcover_with_embedding_diff":
+            from .prob_cover import ProbCover
+            from .embedding_difference_as_probability_density import EmbeddingDifferenceAsProbabilityDensity
+            dataset_info = kwargs["dataset_info"]
+            print(f"ep {self.cur_episode}: ", end="")
+            if self.cur_episode >= self.cfg.ACTIVE_LEARNING.PROBCOVER_ITER:
+                print("running emb diff")
+                al = EmbeddingDifferenceAsProbabilityDensity(self.cfg, lSet, uSet, self.cfg.ACTIVE_LEARNING.BUDGET_SIZE,
+                                                             self.cfg.ACTIVE_LEARNING.EMBEDDING_PATH, dataset_info, kernel_size=11, )
+            else:
+                print("running probcover")
+                al = ProbCover(self.cfg, lSet, uSet, budgetSize=self.cfg.ACTIVE_LEARNING.BUDGET_SIZE,
+                               delta=self.cfg.ACTIVE_LEARNING.DELTA, embedding_path=self.cfg.ACTIVE_LEARNING.EMBEDDING_PATH)
+            activeSet, uSet = al.select_samples()
+                     
         elif self.cfg.ACTIVE_LEARNING.SAMPLING_FN == "dbal" or self.cfg.ACTIVE_LEARNING.SAMPLING_FN == "DBAL":
             activeSet, uSet = self.sampler.dbal(budgetSize=self.cfg.ACTIVE_LEARNING.BUDGET_SIZE, \
                 uSet=uSet, clf_model=clf_model,dataset=trainDataset)

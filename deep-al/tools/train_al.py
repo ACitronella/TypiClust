@@ -44,6 +44,7 @@ import pycls.utils.net as nu
 from pycls.utils.meters import TestMeter, TrainMeter, ValMeter
 from pycls.datasets.blink_dataset import BlinkDataset, ImageDataFrameBlinkingWrapper
 from pycls.datasets.blink_dataset_with_no_test_set import BlinkDataset2
+import pycls.datasets.utils as ds_utils
 
 logger = lu.get_logger(__name__)
 # model params
@@ -51,7 +52,6 @@ input_size = 256
 num_nb = 10
 num_lms = 21
 net_stride = 32
-MODEL_GRAVEYARD = "../model_graveyard"
 
 plot_episode_xvalues = []
 plot_episode_yvalues = []
@@ -779,7 +779,7 @@ def main(cfg):
         dataset_info = None
     if len(lSet) == 0:
         print('Labeled Set is Empty - Sampling an Initial Pool')
-        al_obj = ActiveLearning(data_obj, cfg)
+        al_obj = ActiveLearning(data_obj, cfg, cur_episode=0, dataset_info=dataset_info)
         if cfg.ACTIVE_LEARNING.SAMPLING_FN == "typiclust_rp":
             activeSet, new_uSet, clusters = al_obj.sample_from_uSet(model, lSet, uSet, train_data, dataset_info=dataset_info)
             # train_data_feat_embbeded = TSNE(2, init="pca").fit_transform(train_data.features)
@@ -866,7 +866,7 @@ def main(cfg):
     kp, kp_merge = process_pip_out(xy[1].unsqueeze(0), xy[2].unsqueeze(0), xy[3].unsqueeze(0), xy[4].unsqueeze(0), xy[5].unsqueeze(0), reverse_index1, reverse_index2, max_len)
     assert np.isclose(kp, kp_merge).all()
     imshow_kp(img, lms_pred=kp)
-    plt.savefig(os.path.join(MODEL_GRAVEYARD, "assert-train.png"), bbox_inches='tight')
+    plt.savefig(os.path.join(exp_dir, "assert-train.png"), bbox_inches='tight')
     
     xy = val_dataset[0]
     img = xy[0]
@@ -874,7 +874,7 @@ def main(cfg):
     kp, kp_merge = process_pip_out(xy[1].unsqueeze(0), xy[2].unsqueeze(0), xy[3].unsqueeze(0), xy[4].unsqueeze(0), xy[5].unsqueeze(0), reverse_index1, reverse_index2, max_len)
     assert np.isclose(kp, kp_merge).all()
     imshow_kp(img, lms_pred=kp)
-    plt.savefig(os.path.join(MODEL_GRAVEYARD, "assert-val.png"), bbox_inches='tight')
+    plt.savefig(os.path.join(exp_dir, "assert-val.png"), bbox_inches='tight')
 
     train_dataloader_wrapper = functools.partial(DataLoader, batch_size=cfg.TRAIN.BATCH_SIZE, num_workers=8, shuffle=True, pin_memory=False)
     val_dataloader_wrapper = functools.partial(DataLoader, batch_size=512, num_workers=0, shuffle=False, pin_memory=False)
@@ -891,6 +891,7 @@ def main(cfg):
         if not os.path.exists(episode_dir):
             os.mkdir(episode_dir)
         cfg.EPISODE_DIR = episode_dir
+        print(len(train_dataset))
 
         if not skip_training:
             # Train model
@@ -928,7 +929,7 @@ def main(cfg):
         # Active Sample 
         print("======== ACTIVE SAMPLING ========\n")
         logger.info("======== ACTIVE SAMPLING ========\n")
-        al_obj = ActiveLearning(data_obj, cfg)
+        al_obj = ActiveLearning(data_obj, cfg, cur_episode+1, dataset_info)
         # clf_model = model_builder.build_model(cfg)
         # clf_model = cu.load_checkpoint(checkpoint_file, clf_model)
         # activeSet, new_uSet, clusters = al_obj.sample_from_uSet(clf_model, lSet, uSet, train_data)
@@ -1025,9 +1026,42 @@ def main(cfg):
             for eye_info in selected:
                 selected_frames_of_this_patient = patient_wise.setdefault(eye_info["keypoint_file"], [])
                 selected_frames_of_this_patient.append((eye_info["frame_idx"], episode_idx, eye_info["dataset_idx"]))
+
+        embeddings = ds_utils.load_embededing_from_path(cfg.ACTIVE_LEARNING.EMBEDDING_PATH)
+        tb = np.concatenate([[0], dataset_info["frames"].cumsum()])
+        kernel_size = 11
+        kernel = np.ones(kernel_size)/kernel_size
+        l = []
+        for row_idx in set(dataset_info.index):
+            frames = dataset_info.loc[row_idx, "frames"]
+            start_idx = tb[row_idx]
+            end_idx = tb[row_idx+1]
+            a_patient_embedding = embeddings[start_idx:end_idx] # embedding of a patient
+            centroid_emb = a_patient_embedding.mean(0)
+            mean_square_diff_emb = np.mean(np.square(a_patient_embedding - centroid_emb), axis=1)
+            # mean_square_diff_emb = np.mean(np.square(a_patient_embedding - centroid_emb), axis=1)
+            # l.append(mean_square_diff_emb)
+            
+            smoothed_mean_square_diff_emb = np.zeros_like(mean_square_diff_emb)
+            smoothed_mean_square_diff_emb[kernel_size//2:(-kernel_size//2)+1] = np.convolve(mean_square_diff_emb, kernel, mode='valid')
+            smoothed_mean_square_diff_emb[:kernel_size//2] = smoothed_mean_square_diff_emb[kernel_size//2]
+            smoothed_mean_square_diff_emb[-kernel_size//2+1:] = smoothed_mean_square_diff_emb[-kernel_size//2+1]
+
+            if cfg.ACTIVE_LEARNING.SAMPLING_FN == "embedding_difference_as_probability_density_reduce_high_frame_prob":
+                l.append(smoothed_mean_square_diff_emb/frames)
+            else:
+                l.append(smoothed_mean_square_diff_emb)
+        v = np.concatenate(l)
+        if cfg.ACTIVE_LEARNING.SAMPLING_FN == "embedding_difference_as_probability_density_with_softmax":
+            v = torch.softmax(torch.from_numpy(v)*cfg.ACTIVE_LEARNING.SOFTMAX_TEMPERATURE, dim=0).numpy()
+        w = (v - v.min())
+        y = w / w.max()
+        z = y / y.sum() # prob density
+        pd_max = z.max()
+        pd_min = z.min()
         plt.figure(figsize=(2000/150, 3000/150), dpi=150)
         plt.subplots_adjust(hspace=0.4)
-        for row_idx, eye_info in dataset_info.iterrows():
+        for idx, (row_idx, eye_info) in enumerate(dataset_info.iterrows()):
             selected_frame_and_episode = patient_wise.get(eye_info["keypoint_file"], [])
             if selected_frame_and_episode:
                 selected_frame_and_episode = np.asarray(selected_frame_and_episode)
@@ -1052,6 +1086,11 @@ def main(cfg):
                 imagebox = OffsetImage(np.array(img), zoom=0.10, alpha=0.6)
                 ab = AnnotationBbox(imagebox, (frame_idx, 12), frameon=False)
                 plt.gca().add_artist(ab)
+            plt.twinx()
+            plt.plot(z[tb[idx]:tb[idx+1]], "o", markersize=1, alpha=0.5, )
+            plt.ylim(pd_min, pd_max)
+            plt.yticks(fontsize="xx-small")
+            plt.ylabel("Probability density")
         plt.savefig(os.path.join(exp_dir, "selected_frames.png"), bbox_inches='tight')
 
 def train_model(train_loader, val_loader, model, optimizer, cfg):

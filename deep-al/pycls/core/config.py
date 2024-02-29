@@ -208,6 +208,8 @@ _C.ACTIVE_LEARNING.FRAME_DIFF_FACTOR = 0.00005
 _C.ACTIVE_LEARNING.BLINK_FRAME_TO_ALL_RATIO = 1.
 _C.ACTIVE_LEARNING.SOFTMAX_TEMPERATURE = 0.0001
 
+_C.ACTIVE_LEARNING.PROBCOVER_ITER = 1 # for hybrid (run probcover first)
+
 # ---------------------------------------------------------------------------- #
 # Common train/test data loader options
 # ---------------------------------------------------------------------------- #
