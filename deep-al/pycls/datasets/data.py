@@ -261,13 +261,13 @@ class Data:
             return im_cifar100, len(im_cifar100)
         elif "blink2" in self.dataset:
             is_blinking = kwargs.get('is_blinking')
-            im_blink = BlinkDataset2(dataset_path=save_dir, train=isTrain, transform=preprocess_steps, test_transform=test_preprocess_steps, fold_idx=fold_idx, use_faster=is_blinking is None)
+            im_blink = BlinkDataset2(dataset_path=save_dir, train=isTrain, transform=preprocess_steps, test_transform=test_preprocess_steps, fold_idx=fold_idx, use_faster=kwargs["use_faster"] if "use_faster" in kwargs else (is_blinking is None))
             if is_blinking is not None:
                 im_blink = ImageDataFrameBlinkingWrapper(im_blink, is_blinking=is_blinking)
             return im_blink, len(im_blink)
         elif "blink" in self.dataset:
             is_blinking = kwargs.get('is_blinking')
-            im_blink = BlinkDataset(dataset_path=save_dir, train=isTrain, transform=preprocess_steps, test_transform=test_preprocess_steps, fold_idx=fold_idx, use_faster=is_blinking is None)
+            im_blink = BlinkDataset(dataset_path=save_dir, train=isTrain, transform=preprocess_steps, test_transform=test_preprocess_steps, fold_idx=fold_idx, use_faster=kwargs["use_faster"] if "use_faster" in kwargs else (is_blinking is None))
             if is_blinking is not None:
                 im_blink = ImageDataFrameBlinkingWrapper(im_blink, is_blinking=is_blinking)
             return im_blink, len(im_blink)
