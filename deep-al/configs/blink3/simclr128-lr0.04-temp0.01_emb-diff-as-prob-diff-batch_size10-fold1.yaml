@@ -1,5 +1,5 @@
 # Folder name where best model logs etc are saved. "auto" creates a timestamp based folder
-EXP_NAME: 'simclr128-lr0.04-temp0.01_emb-diff-as-prob-dens-batchsize10'
+EXP_NAME: 'simclr128-lr0.04-temp0.01_emb-diff-as-prob-dens-finetune-batchsize10'
 RNG_SEED: 33
 DATASET:
   NAME: blink2_fold1 # or CIFAR100, MNIST, SVHN, TinyImageNet
@@ -21,7 +21,7 @@ ACTIVE_LEARNING:
   SAMPLING_FN: 'embedding_difference_as_probability_density' # Active sampling method
   MAX_ITER: 10 # Max AL episodes
   EMBEDDING_PATH: "../../scan/results/blink2_fold1/pretext/features_seed133_lr0.04_temp0.01.npy" # used by typiclust and probcover
-  FINE_TUNE: False
+  FINE_TUNE: True
   INIT_L_RATIO: 0. # init labeled set
 OPTIM:
   TYPE: 'adam' # or 'adam'

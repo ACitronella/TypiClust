@@ -21,7 +21,7 @@ ACTIVE_LEARNING:
   SAMPLING_FN: 'embedding_difference_as_probability_density' # Active sampling method
   MAX_ITER: 10 # Max AL episodes
   EMBEDDING_PATH: "../../scan/results/blink2_fold4/pretext/features_seed133_lr0.04_temp0.01.npy" # used by typiclust and probcover
-  FINE_TUNE: False
+  FINE_TUNE: True
   INIT_L_RATIO: 0. # init labeled set
 OPTIM:
   TYPE: 'adam' # or 'adam'
