@@ -1,5 +1,5 @@
 # Folder name where best model logs etc are saved. "auto" creates a timestamp based folder
-EXP_NAME: 'simclr128-lr0.04-temp0.01_emb-diff-as-prob-dens-batchsize10'
+EXP_NAME: 'simclr128-lr0.04-temp0.01_emb-diff-as-prob-dens-finetune-batchsize10'
 RNG_SEED: 36
 DATASET:
   NAME: blink2_fold4 # or CIFAR100, MNIST, SVHN, TinyImageNet
