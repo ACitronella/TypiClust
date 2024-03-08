@@ -16,41 +16,42 @@ import pycls.datasets.utils as ds_utils
 from pycls.datasets.data import Data
 from pycls.core.config import cfg
 
-def plot_select_each_iter():
-    embeddings = ds_utils.load_embededing_from_path(cfg.ACTIVE_LEARNING.EMBEDDING_PATH)
-    tb = np.concatenate([[0], dataset_info["frames"].cumsum()])
-    kernel_size = 11
-    kernel = np.ones(kernel_size)/kernel_size
-    l = []
-    for idx, row_idx in enumerate(dataset_info.index):
-        frames = dataset_info.loc[row_idx, "frames"]
-        start_idx = tb[idx]
-        end_idx = tb[idx+1]
-        a_patient_embedding = embeddings[start_idx:end_idx] # embedding of a patient
-        centroid_emb = a_patient_embedding.mean(0)
-        mean_square_diff_emb = np.mean(np.square(a_patient_embedding - centroid_emb), axis=1)
-        # mean_square_diff_emb = np.mean(np.square(a_patient_embedding - centroid_emb), axis=1)
-        # l.append(mean_square_diff_emb)
-            
-        smoothed_mean_square_diff_emb = np.zeros_like(mean_square_diff_emb)
-        smoothed_mean_square_diff_emb[kernel_size//2:(-kernel_size//2)+1] = np.convolve(mean_square_diff_emb, kernel, mode='valid')
-        smoothed_mean_square_diff_emb[:kernel_size//2] = smoothed_mean_square_diff_emb[kernel_size//2]
-        smoothed_mean_square_diff_emb[-kernel_size//2+1:] = smoothed_mean_square_diff_emb[-kernel_size//2+1]
+def plot_select_each_iter(prob_dist=False):
+    if prob_dist:
+        embeddings = ds_utils.load_embededing_from_path(cfg.ACTIVE_LEARNING.EMBEDDING_PATH)
+        tb = np.concatenate([[0], dataset_info["frames"].cumsum()])
+        kernel_size = 11
+        kernel = np.ones(kernel_size)/kernel_size
+        l = []
+        print("embdedding size", embeddings.shape)
+        for idx, row_idx in enumerate(dataset_info.index):
+            frames = dataset_info.loc[row_idx, "frames"]
+            start_idx = tb[idx]
+            end_idx = tb[idx+1]
+            a_patient_embedding = embeddings[start_idx:end_idx] # embedding of a patient
+            centroid_emb = a_patient_embedding.mean(0)
+            mean_square_diff_emb = np.mean(np.square(a_patient_embedding - centroid_emb), axis=1)
+            # mean_square_diff_emb = np.mean(np.square(a_patient_embedding - centroid_emb), axis=1)
+            # l.append(mean_square_diff_emb)
+            smoothed_mean_square_diff_emb = np.zeros_like(mean_square_diff_emb)
+            smoothed_mean_square_diff_emb[kernel_size//2:(-kernel_size//2)+1] = np.convolve(mean_square_diff_emb, kernel, mode='valid')
+            smoothed_mean_square_diff_emb[:kernel_size//2] = smoothed_mean_square_diff_emb[kernel_size//2]
+            smoothed_mean_square_diff_emb[-kernel_size//2+1:] = smoothed_mean_square_diff_emb[-kernel_size//2+1]
 
-        if cfg.ACTIVE_LEARNING.SAMPLING_FN == "embedding_difference_as_probability_density_reduce_high_frame_prob":
-            l.append(smoothed_mean_square_diff_emb/frames)
-        else:
-            l.append(smoothed_mean_square_diff_emb)
-    v = np.concatenate(l)
-    v = v.astype("float64")
-    if cfg.ACTIVE_LEARNING.SAMPLING_FN == "embedding_difference_as_probability_density_with_softmax":
-        v = torch.softmax(torch.from_numpy(v)*cfg.ACTIVE_LEARNING.SOFTMAX_TEMPERATURE, dim=0).numpy()
-    w = (v - v.min())
-    y = w / w.max()
-    z = y / y.sum() # prob density
-    pd_max = z.max()
-    pd_min = z.min()
-    prob_mass = [np.sum(z[start_idx:end_idx]) for start_idx, end_idx in zip(tb, tb[1:])]
+            if cfg.ACTIVE_LEARNING.SAMPLING_FN == "embedding_difference_as_probability_density_reduce_high_frame_prob":
+                l.append(smoothed_mean_square_diff_emb/frames)
+            else:
+                l.append(smoothed_mean_square_diff_emb)
+        v = np.concatenate(l)
+        v = v.astype("float64")
+        if cfg.ACTIVE_LEARNING.SAMPLING_FN == "embedding_difference_as_probability_density_with_softmax":
+            v = torch.softmax(torch.from_numpy(v)*cfg.ACTIVE_LEARNING.SOFTMAX_TEMPERATURE, dim=0).numpy()
+        w = (v - v.min())
+        y = w / w.max()
+        z = y / y.sum() # prob density
+        pd_max = z.max()
+        pd_min = z.min()
+        # prob_mass = [np.sum(z[start_idx:end_idx]) for start_idx, end_idx in zip(tb, tb[1:])]
 
     ori_shape = all_sampled_set.shape        
     all_sampled_set_with_pcode_fidx = [train_data.get_patient_code_and_frame_from_idx(idx) for idx in all_sampled_set.flatten()]
@@ -74,7 +75,7 @@ def plot_select_each_iter():
             episode_selected = []
         
         plt.subplot(dataset_info.shape[0]//2, 2, idx + 1)
-        plt.title(f"{eye_info['patient_code']} {eye_info['keypoints_key'][0]} (probmass: {prob_mass[idx]:.4f})")
+        plt.title(f"{eye_info['patient_code']} {eye_info['keypoints_key'][0]}")
         plt.scatter(selected_frames, episode_selected, c=[f"C{ep}" for ep in episode_selected])
         plt.xlim(-1, eye_info["frames"])
         plt.ylim(-1, 15)
@@ -88,12 +89,14 @@ def plot_select_each_iter():
             imagebox = OffsetImage(np.array(img), zoom=0.10, alpha=0.6)
             ab = AnnotationBbox(imagebox, (frame_idx, 12), frameon=False)
             plt.gca().add_artist(ab)
-        plt.twinx()
-        plt.plot(z[tb[idx]:tb[idx+1]], "o", markersize=1, alpha=0.1, )
-        plt.ylim(pd_min, pd_max)
-        plt.yticks(fontsize="xx-small")
-        plt.ylabel("Probability density")
+        if prob_dist:
+            plt.twinx()
+            plt.plot(z[tb[idx]:tb[idx+1]], "o", markersize=1, alpha=0.1, )
+            plt.ylim(pd_min, pd_max)
+            plt.yticks(fontsize="xx-small")
+            plt.ylabel("Probability density")
     save_path = os.path.join(exp_dir, "selected_frames_re.png")
+    print(save_path)
     plt.savefig(save_path, bbox_inches='tight')
 
 def calculate_selected_blink_and_nonblink_frame():
@@ -136,13 +139,17 @@ def calculate_selected_blink_and_nonblink_frame():
     plt.ylabel("Number of frame") 
     plt.title(f"{exp_name} fold{fold_idx}")
     plt.savefig(os.path.join(exp_dir, "bar.png"))
+    print(os.path.join(exp_dir, "bar.png"))
     
 
 if "__main__" == __name__: 
-    MODEL_GRAVEYARD = "../model_graveyard"
+    MODEL_GRAVEYARD = "../model_graveyard_but_use_mse_as_best_indicator"
+    # MODEL_GRAVEYARD = "../model_graveyard_but_use_mse2"
+    # MODEL_GRAVEYARD = "../model_graveyard_but_use_mse3"
     FOLDS = 5
     for fold_idx in range(FOLDS):
-        cfg_path = f"../configs/blink2/simclr128-lr0.04-temp0.01_probcover0.2-1epoch-then-emb-diff-finetune-batch_size10-fold{fold_idx}.yaml"
+        # cfg_path = f"../configs/blink3/simclr128-lr0.04-temp0.01_emb-diff-as-prob-diff-batch_size10-fold{fold_idx}.yaml"
+        cfg_path = f"../configs/blink3/random-finetune-batch_size10-fold{fold_idx}.yaml"
         cfg.merge_from_file(cfg_path)
         exp_name = cfg.EXP_NAME
         fold_idx = cfg.DATASET.FOLD_IDX
@@ -173,4 +180,7 @@ if "__main__" == __name__:
         data_obj = Data(cfg)
         train_data, train_size = data_obj.getDataset(save_dir=cfg.DATASET.ROOT_DIR, isTrain=True, isDownload=True, fold_idx=cfg.DATASET.FOLD_IDX, is_blinking=cfg.DATASET.IS_BLINKING, use_faster=False)
 
-        calculate_selected_blink_and_nonblink_frame()
+        print("training set size:", train_size)
+        # calculate_selected_blink_and_nonblink_frame()
+        plot_select_each_iter(prob_dist=False)
+        
