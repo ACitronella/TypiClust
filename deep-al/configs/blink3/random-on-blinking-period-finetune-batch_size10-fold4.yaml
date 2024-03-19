@@ -19,7 +19,7 @@ MODEL:
   NUM_CLASSES: 10
 ACTIVE_LEARNING:
   BUDGET_SIZE: 10 # Active sampling budget (at each episode)
-  SAMPLING_FN: 'random' # Active sampling method
+  SAMPLING_FN: 'random_on_blinking_period' # Active sampling method
   MAX_ITER: 10 # Max AL episodes
   FINE_TUNE: True
   INIT_L_RATIO: 0. # init labeled set

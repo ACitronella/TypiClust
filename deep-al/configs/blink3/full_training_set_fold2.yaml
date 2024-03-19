@@ -1,13 +1,14 @@
 # Folder name where best model logs etc are saved. "auto" creates a timestamp based folder
-EXP_NAME: 'random_on_blinking_period_finetune'
-RNG_SEED: 35
+EXP_NAME: 'full_training'
+# Note that non-determinism may still be present due to non-deterministic
+# operator implementations in GPU operator libraries
+RNG_SEED: 34
 DATASET:
-  NAME: blink2_fold3 # or CIFAR100, MNIST, SVHN, TinyImageNet
-  FOLD_IDX: 3
+  NAME: blink2_fold2 # or CIFAR100, MNIST, SVHN, TinyImageNet
   ROOT_DIR: '../../pytorchlm/' # Relative path where data should be downloaded
   # Specifies the proportion of data in train set that should be considered as the validation data
-  VAL_RATIO: 0.1 # unused
-  IS_BLINKING: True
+  # VAL_RATIO: 0.1
+  FOLD_IDX: 2
   # Data augmentation methods - 'simclr', 'randaug', 'horizontalflip'
   # AUG_METHOD: 'horizontalflip' 
 MODEL:
@@ -17,14 +18,7 @@ MODEL:
   # 'wide_resnet50_2', 'wide_resnet101_2']
   TYPE: resnet18
   NUM_CLASSES: 10
-ACTIVE_LEARNING:
-  BUDGET_SIZE: 10 # Active sampling budget (at each episode)
-  SAMPLING_FN: 'random_on_blinking_period' # Active sampling method
-  MAX_ITER: 10 # Max AL episodes
-  FINE_TUNE: True
-  INIT_L_RATIO: 0. # init labeled set
-
-OPTIM: # unused for now
+OPTIM:
   TYPE: 'adam' # or 'adam'
   BASE_LR: 0.001
   # Learning rate policy select from {'cos', 'exp', 'steps'}
@@ -44,30 +38,34 @@ OPTIM: # unused for now
   # GAMMA: 0.1
 TRAIN:
   SPLIT: train
+  NUM_EPOCHS: 40
   # Training mini-batch size
-  BATCH_SIZE: 10
+  BATCH_SIZE: 256
   # Image size
   IM_SIZE: 256
   IM_CHANNELS: 3
   # Evaluate model on test data every eval period epochs
-  # EVAL_PERIOD: 1 
-  NUM_EPOCHS: 40
+  EVAL_PERIOD: 1
   INDICATE_BEST_BY: "validation_mses"
 TEST:
   SPLIT: test
   # Testing mini-batch size
-  BATCH_SIZE: 256
+  BATCH_SIZE: 32
   # Image size
-  IM_SIZE: 256
+  IM_SIZE: 32
   # Saved model to use for testing (useful when running tools/test_model.py)
   MODEL_PATH: ''
 DATA_LOADER:
   NUM_WORKERS: 8
 CUDNN:
   BENCHMARK: True
-
-
-  # DROPOUT_ITERATIONS: 10 # Used by DBAL
+ACTIVE_LEARNING:
+  # Active sampling budget (at each episode)
+  SAMPLING_FN: 'random' # 'random', 'uncertainty', 'entropy', 'margin', 'bald', 'vaal', 'coreset', 'ensemble_var_R'
+  INIT_L_RATIO: 1.
+  BUDGET_SIZE: 10
+  MAX_ITER: 1
+  FINE_TUNE: False
 # Useful when running `tools/ensemble_al.py` or `tools/ensemble_train.py`
 ENSEMBLE: 
   NUM_MODELS: 3

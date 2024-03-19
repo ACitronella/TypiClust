@@ -1,14 +1,14 @@
 # Folder name where best model logs etc are saved. "auto" creates a timestamp based folder
 EXP_NAME: 'random_on_blinking_period_finetune'
-RNG_SEED: 35
+RNG_SEED: 46
 DATASET:
-  NAME: blink2_fold3 # or CIFAR100, MNIST, SVHN, TinyImageNet
-  FOLD_IDX: 3
+  NAME: blink2_fold4 # or CIFAR100, MNIST, SVHN, TinyImageNet
+  FOLD_IDX: 4
   ROOT_DIR: '../../pytorchlm/' # Relative path where data should be downloaded
   # Specifies the proportion of data in train set that should be considered as the validation data
   VAL_RATIO: 0.1 # unused
-  IS_BLINKING: True
   # Data augmentation methods - 'simclr', 'randaug', 'horizontalflip'
+  IS_BLINKING: True
   # AUG_METHOD: 'horizontalflip' 
 MODEL:
   # Model type. 

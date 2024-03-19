@@ -1,9 +1,9 @@
 # Folder name where best model logs etc are saved. "auto" creates a timestamp based folder
 EXP_NAME: 'random_on_blinking_period_finetune'
-RNG_SEED: 35
+RNG_SEED: 44
 DATASET:
-  NAME: blink2_fold3 # or CIFAR100, MNIST, SVHN, TinyImageNet
-  FOLD_IDX: 3
+  NAME: blink2_fold2 # or CIFAR100, MNIST, SVHN, TinyImageNet
+  FOLD_IDX: 2
   ROOT_DIR: '../../pytorchlm/' # Relative path where data should be downloaded
   # Specifies the proportion of data in train set that should be considered as the validation data
   VAL_RATIO: 0.1 # unused
