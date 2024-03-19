@@ -129,6 +129,8 @@ class BlinkDataset2(Dataset):
                 return None
             self.is_blinking = is_blinking
             self.last_file_idx = file_idx
+            self.x = xy[self.dataset_info.loc[file_idx, "eye_key"]]
+            self.y = xy[self.dataset_info.loc[file_idx, "keypoints_key"]]
             
         return self.is_blinking[frame_idx]
 
