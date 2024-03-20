@@ -77,6 +77,7 @@ class Data:
         self.aug_method = cfg.DATASET.AUG_METHOD
         self.rand_augment_N = 1 if cfg is None else cfg.RANDAUG.N
         self.rand_augment_M = 5 if cfg is None else cfg.RANDAUG.M
+        self.dataset_obj = None
 
     def about(self):
         """
@@ -343,6 +344,42 @@ class Data:
         
         return f'{save_dir}/lSet.npy', f'{save_dir}/uSet.npy', f'{save_dir}/valSet.npy'
 
+
+    def makeLUSetsByNumberOfEyes(self, n_train_patient, dataset, save_dir): # rename pls
+        # assert self.dataset in self.datasets_accepted, "Sorry the dataset {} is not supported. Currently we support {}".format(self.dataset, self.datasets_accepted)
+        assert any([ds_name in self.dataset  for ds_name in ["blink2"]]), "Sorry the dataset {} is not supported. Currently we support {}".format(self.dataset, ["blink2"])
+        lSet = []
+        uSet = []
+        
+        n_dataPoints = len(dataset)
+        all_idx = [i for i in range(n_dataPoints)]
+
+        dataset_info = dataset.dataset_info
+        indices_table = dataset.indices_table
+        patient_code = dataset_info["patient_code"].unique()
+        train_patient_code = patient_code[:n_train_patient] # or maybe random with fixed seed
+        # unlabel_patient_code = patient_code[n_train_patient:]
+        for p_code in train_patient_code:
+            this_patient_info = dataset_info[dataset_info["patient_code"] == p_code]
+            for idx in this_patient_info.index:
+                lSet.append(np.arange(indices_table[idx], indices_table[idx+1], dtype="int32"))
+        lSet = np.concatenate(lSet)
+        uSet = np.setdiff1d(all_idx, lSet)
+
+        # sanity check
+        train_patient = set([dataset.get_patient_code_and_frame_from_idx(idx)['patient_code'] for idx in lSet])
+        unlabel_patient = set([dataset.get_patient_code_and_frame_from_idx(idx)['patient_code'] for idx in uSet])
+        assert len(train_patient.intersection(unlabel_patient)) == 0, "In the seperation phase, label and unlabel must be disjoint."
+        print("train_patient: ", train_patient)
+        print("unlabel_patient: ", unlabel_patient)
+
+        lSet = np.array(lSet, dtype=np.ndarray)
+        uSet = np.array(uSet, dtype=np.ndarray)
+
+        np.save(f'{save_dir}/lSet.npy', lSet)
+        np.save(f'{save_dir}/uSet.npy', uSet)
+        return f'{save_dir}/lSet.npy', f'{save_dir}/uSet.npy'
+
     def makeTVSets(self, val_split_ratio, data, seed_id, save_dir):
         """
         Initialize the train and validation sets by splitting the train data according to split_ratios arguments.
@@ -560,6 +597,17 @@ class Data:
         assert len(set(uSet) & set(lSet)) == 0,"Intersection is not allowed between uSet and lSet"
 
         return lSet, uSet, valSet
+    
+    def loadLUPartitions(self, lSetPath, uSetPath):
+        assert isinstance(lSetPath, str), "Expected lSetPath to be a string."
+        assert isinstance(uSetPath, str), "Expected uSetPath to be a string."
+
+        lSet = np.load(lSetPath, allow_pickle=True)
+        uSet = np.load(uSetPath, allow_pickle=True)
+
+        #Checking no overlap
+        assert len(set(uSet) & set(lSet)) == 0,"Intersection is not allowed between uSet and lSet"
+        return lSet, uSet
 
     def loadTVPartitions(self, trainSetPath, valSetPath):
 

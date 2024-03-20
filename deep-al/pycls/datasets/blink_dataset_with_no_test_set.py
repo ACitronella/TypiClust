@@ -70,7 +70,7 @@ class BlinkDataset2(Dataset):
     def get_patient_code_and_frame_from_idx(self, idx):
         file_idx = np.argmax(self.indices_table > idx) - 1 # get first file that >= idx
         frame_idx = idx - self.indices_table[file_idx]
-        row = self.dataset_info.loc[file_idx].copy()
+        row = self.dataset_info.loc[file_idx]
         row["frame_idx"] = frame_idx
         row["dataset_idx"] = idx
         return row.to_dict()
