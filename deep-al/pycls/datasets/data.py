@@ -18,6 +18,7 @@ from pycls.datasets.sampler import IndexedSequentialSampler
 from pycls.datasets.tiny_imagenet import TinyImageNet
 from pycls.datasets.blink_dataset import BlinkDataset, ImageDataFrameBlinkingWrapper
 from pycls.datasets.blink_dataset_with_no_test_set import BlinkDataset2
+from pycls.datasets.blink_dataset_all import BlinkDatasetAll
 logger = lu.get_logger(__name__)
 
 class _RepeatSampler(object):
@@ -260,6 +261,12 @@ class Data:
         elif self.dataset ==  'IMBALANCED_CIFAR100':
             im_cifar100 = IMBALANCECIFAR100(save_dir, train=isTrain, transform=preprocess_steps, test_transform=test_preprocess_steps)
             return im_cifar100, len(im_cifar100)
+        elif "blinkleaveoneout" in self.dataset:
+            is_blinking = kwargs.get('is_blinking')
+            im_blink = BlinkDatasetAll(dataset_path=save_dir, train=isTrain, transform=preprocess_steps, test_transform=test_preprocess_steps, use_faster=kwargs["use_faster"] if "use_faster" in kwargs else (is_blinking is None))
+            if is_blinking is not None:
+                im_blink = ImageDataFrameBlinkingWrapper(im_blink, is_blinking=is_blinking)
+            return im_blink, len(im_blink)
         elif "blink2" in self.dataset:
             is_blinking = kwargs.get('is_blinking')
             im_blink = BlinkDataset2(dataset_path=save_dir, train=isTrain, transform=preprocess_steps, test_transform=test_preprocess_steps, fold_idx=fold_idx, use_faster=kwargs["use_faster"] if "use_faster" in kwargs else (is_blinking is None))
@@ -379,6 +386,48 @@ class Data:
         np.save(f'{save_dir}/lSet.npy', lSet)
         np.save(f'{save_dir}/uSet.npy', uSet)
         return f'{save_dir}/lSet.npy', f'{save_dir}/uSet.npy'
+    
+    def makeLUSetsByPatients(self, labeled_patient_list, dataset, save_dir): # rename pls
+        # assert self.dataset in self.datasets_accepted, "Sorry the dataset {} is not supported. Currently we support {}".format(self.dataset, self.datasets_accepted)
+        assert any([ds_name in self.dataset for ds_name in ["blink"]]), "Sorry the dataset {} is not supported. Currently we support {}".format(self.dataset, ["blink2"])
+        lSet, uSet = Data.makeLUSetsByPatientsNotSave(labeled_patient_list, dataset)
+
+        np.save(f'{save_dir}/lSet.npy', lSet)
+        np.save(f'{save_dir}/uSet.npy', uSet)
+        return f'{save_dir}/lSet.npy', f'{save_dir}/uSet.npy'
+
+    @staticmethod
+    def makeLUSetsByPatientsNotSave(labeled_patient_list, dataset): # rename pls
+        # assert self.dataset in self.datasets_accepted, "Sorry the dataset {} is not supported. Currently we support {}".format(self.dataset, self.datasets_accepted)
+        # assert any([ds_name in self.dataset for ds_name in ["blink"]]), "Sorry the dataset {} is not supported. Currently we support {}".format(self.dataset, ["blink2"])
+        lSet = []
+        uSet = []
+        
+        n_dataPoints = len(dataset)
+        all_idx = [i for i in range(n_dataPoints)]
+
+        dataset_info = dataset.dataset_info
+        indices_table = dataset.indices_table
+        patient_code = dataset_info["patient_code"].unique()
+
+        # train_patient_code = labeled_patient_list
+        unlabel_patient_code = np.setdiff1d(patient_code, labeled_patient_list)
+        for p_code in unlabel_patient_code:
+            this_patient_info = dataset_info[dataset_info["patient_code"] == p_code]
+            for idx in this_patient_info.index:
+                uSet.append(np.arange(indices_table[idx], indices_table[idx+1], dtype="int32"))
+        uSet = np.concatenate(uSet)
+        lSet = np.setdiff1d(all_idx, uSet)
+
+        # sanity check
+        train_patient = set([dataset.get_patient_code_and_frame_from_idx(idx)['patient_code'] for idx in lSet])
+        unlabel_patient = set([dataset.get_patient_code_and_frame_from_idx(idx)['patient_code'] for idx in uSet])
+        assert len(train_patient.intersection(unlabel_patient)) == 0, "In the seperation phase, label and unlabel must be disjoint."
+        print("train_patient: ", train_patient)
+        print("unlabel_patient: ", unlabel_patient)
+
+        return lSet, uSet
+
 
     def makeTVSets(self, val_split_ratio, data, seed_id, save_dir):
         """

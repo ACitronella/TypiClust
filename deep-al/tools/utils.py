@@ -444,12 +444,12 @@ def eval_on_pipnet(model, dl, reverse_index1, reverse_index2, max_len, DEVICE:Un
         lms_preds, lms_preds_merge = batch_process_pip_out(outputs_map, outputs_x, outputs_y, outputs_nb_x, outputs_nb_y, reverse_index1, reverse_index2, max_len)
         lms_gts, _ = batch_process_pip_out(labels_map, labels_x, labels_y, labels_nb_x, labels_nb_y, reverse_index1, reverse_index2, max_len)
         # for img, lms_gt, lms_pred, lms_pred_merge in zip(imgs, lms_gts, lms_preds, lms_preds_merge):
-        # mse_num = mse_fn(lms_gts, lms_preds);mse_nb_num = mse_fn(lms_gts, lms_preds_merge)
+        mse_num = mse_fn(lms_gts, lms_preds);mse_nb_num = mse_fn(lms_gts, lms_preds_merge)
         mae_num = mae_fn(lms_gts, lms_preds);mae_nb_num = mae_fn(lms_gts, lms_preds_merge)
 
-        model_mse += torch.nn.functional.mse_loss(lms_gts, lms_preds, reduction="none").mean(dim=1).sum()
-        model_mse_nb += torch.nn.functional.mse_loss(lms_gts, lms_preds_merge, reduction="none").mean(dim=1).sum()
-        # model_mse += mse_num.mean(axis=1).sum(); model_mse_nb += mse_nb_num.mean(axis=1).sum()
+        # model_mse += torch.nn.functional.mse_loss(lms_gts, lms_preds, reduction="none").mean(dim=1).sum()
+        # model_mse_nb += torch.nn.functional.mse_loss(lms_gts, lms_preds_merge, reduction="none").mean(dim=1).sum()
+        model_mse += mse_num.mean(axis=1).sum(); model_mse_nb += mse_nb_num.mean(axis=1).sum()
         model_mae += mae_num.mean(axis=1).sum(); model_mae_nb += mae_nb_num.mean(axis=1).sum()
 
     return model_mse/count_img, model_mse_nb/count_img, model_mae/count_img, model_mae_nb/count_img

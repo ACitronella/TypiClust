@@ -9,8 +9,15 @@ import torch
 import torchvision.transforms as transforms
 from data.augment import Augment, Cutout
 from utils.collate import collate_custom
+import sys
+# local
+def add_path(path):
+    if path not in sys.path:
+        sys.path.insert(0, path)
+add_path(os.path.abspath('../deep-al'))
+from pycls.datasets.blink_dataset_all import BlinkDatasetAll
+from pycls.datasets.data import Data
 
- 
 def get_criterion(p):
     if p['criterion'] == 'simclr':
         from losses.losses import SimCLRLoss
@@ -136,6 +143,15 @@ def get_model(p, pretrain_path=None):
 
     return model
 
+class DSWrapper(torch.utils.data.Dataset):
+    def __init__(self, dataset, transform):
+        self.dataset = dataset
+        self.transform = transform
+    def __len__(self):
+        return len(self.dataset)
+    def __getitem__(self, idx):
+        return {"image": self.dataset[idx][0]}
+
 
 def get_train_dataset(p, transform, to_augmented_dataset=False,
                         to_neighbors_dataset=False, split=None):
@@ -164,16 +180,25 @@ def get_train_dataset(p, transform, to_augmented_dataset=False,
         from data.imagenet import ImageNetSubset
         subset_file = './data/imagenet_subsets/%s.txt' %(p['train_db_name'])
         dataset = ImageNetSubset(subset_file=subset_file, split='train', transform=transform)
-     
+
+    elif "blink_all" in p['train_db_name']:
+        dataset = BlinkDatasetAll(train=True, transform=None, test_transform=None, dataset_path="../../../pytorchlm")
+        pcode_to_exclude = p["fold_idx"]
+        patient_code_all = dataset.dataset_info["patient_code"].unique()
+        train_pcode = np.setdiff1d(patient_code_all, [pcode_to_exclude])
+        train_idx, _ = Data.makeLUSetsByPatientsNotSave(train_pcode, dataset)
+        dataset = torch.utils.data.Subset(dataset, train_idx)
+        dataset = DSWrapper(dataset, transform)
+
     elif "blink2" in p['train_db_name']:
         from data.blink_dataset import BlinkDataset2
         dataset = BlinkDataset2(train=True, transform=transform, fold_idx=p["fold_idx"])
-        blink_indices_table = dataset.indices_table
+        
 
     elif "blink" in p['train_db_name']:
         from data.blink_dataset import BlinkDataset
         dataset = BlinkDataset(train=True, transform=transform, fold_idx=p["fold_idx"])
-        blink_indices_table = dataset.indices_table
+        
     else:
         raise ValueError('Invalid train dataset {}'.format(p['train_db_name']))
     
@@ -187,8 +212,9 @@ def get_train_dataset(p, transform, to_augmented_dataset=False,
         indices = np.load(p['topk_neighbors_train_path'])
         dataset = NeighborsDataset(dataset, indices, p['num_neighbors'])
 
-    if "blink" in p['train_db_name']:
-        return dataset, BlinkSampler(blink_indices_table)
+    # if "blink" in p['train_db_name']:
+    #     blink_indices_table = dataset.indices_table
+    #     return dataset, BlinkSampler(blink_indices_table)
     return dataset
 
 
@@ -218,7 +244,13 @@ def get_val_dataset(p, transform=None, to_neighbors_dataset=False):
         from data.imagenet import ImageNetSubset
         subset_file = './data/imagenet_subsets/%s.txt' %(p['val_db_name'])
         dataset = ImageNetSubset(subset_file=subset_file, split='val', transform=transform)
-    elif "blink" in p['train_db_name']:
+    elif "blink_all" in p["train_db_name"]:
+        dataset = BlinkDatasetAll(train=False, transform=transform, test_transform=None, dataset_path="../../../pytorchlm")
+        # pcode_to_include = p["fold_idx"]
+        # train_idx, _ = Data.makeLUSetsByPatientsNotSave([pcode_to_include], dataset)
+        # dataset = torch.utils.data.Subset(dataset, train_idx)
+        dataset = DSWrapper(dataset, transform)
+    elif "blink2" in p['train_db_name']:
         from data.blink_dataset import BlinkDataset2
         dataset = BlinkDataset2(train=False, transform=transform, fold_idx=p["fold_idx"])
     elif "blink" in p['train_db_name']:

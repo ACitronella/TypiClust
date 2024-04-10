@@ -8,12 +8,12 @@ class EmbeddingDifferenceAsProbabilityDensity:
         self.cfg = cfg
         self.embedding_path = embedding_path
         self.all_features = ds_utils.load_embededing_from_path(embedding_path)
-        self.lSet = lSet.astype(int)
-        self.uSet = uSet.astype(int)
+        self.lSet = np.asarray(lSet).astype(int)
+        self.uSet = np.asarray(uSet).astype(int)
         self.budgetSize = budgetSize
         self.dataset_info = dataset_info
         self.kernel_size = kernel_size
-        self.kernel = np.ones(kernel_size)/kernel_size
+        kernel = np.ones(kernel_size)/kernel_size
         self.tb = self.dataset_info["frames"].cumsum()
         
         self.relevant_indices = np.concatenate([self.lSet, self.uSet]).astype(int)
@@ -26,11 +26,12 @@ class EmbeddingDifferenceAsProbabilityDensity:
             start_idx = self.tb[row_idx-1] if row_idx-1 >= 0 else 0
             end_idx = self.tb[row_idx]
             a_patient_embedding = self.all_features[start_idx:end_idx]
-
+            if np.prod(a_patient_embedding.shape) == 0:
+                continue
             centroid = a_patient_embedding.mean(0)
             mean_square_diff_em = np.mean(np.square(a_patient_embedding - centroid), axis=1)
-            smoothed_mean_square_diff_em = np.zeros_like(mean_square_diff_em)
-            smoothed_mean_square_diff_em[kernel_size//2:(-kernel_size//2)+1] = np.convolve(mean_square_diff_em, self.kernel, mode='valid')
+            smoothed_mean_square_diff_em = np.zeros_like(mean_square_diff_em)            
+            smoothed_mean_square_diff_em[kernel_size//2:(-kernel_size//2)+1] = np.convolve(mean_square_diff_em, kernel, mode='valid')
             smoothed_mean_square_diff_em[:kernel_size//2] = smoothed_mean_square_diff_em[kernel_size//2]
             smoothed_mean_square_diff_em[-kernel_size//2+1:] = smoothed_mean_square_diff_em[-kernel_size//2+1]
             v.append(smoothed_mean_square_diff_em)

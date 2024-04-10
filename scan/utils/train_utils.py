@@ -47,8 +47,8 @@ def simclr_train(train_loader, model, criterion, optimizer, epoch, is_byol):
             loss = criterion(output)
         losses.update(loss.item())
         loss.backward()
-        optimizer.zero_grad()
         optimizer.step()
+        optimizer.zero_grad()
 
         if i % 25 == 0:
             progress.display(i)

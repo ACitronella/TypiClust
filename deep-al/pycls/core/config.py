@@ -25,6 +25,7 @@ _C.NUM_GPUS = 1
 # _C.INDICATE_BEST_BY = "validation_mses_nb"
 _C.MODEL_GRAVEYARD = "../model_graveyard"
 _C.MODEL_INIT_WEIGHTS = "../model_graveyard/init_weights/pipnet_init_weights.pt"
+_C.PRETRAINED_WEIGHTS_EACH_PATIENT = "../model_graveyard_but_leaveoneout/test/{patient_code}/init_best_{n_train}n.pt"
 
 # Output directory (will be created at the projec root)
 _C.OUT_DIR = 'output'
@@ -240,7 +241,7 @@ _C.DATASET.VAL_RATIO = 0.1
 # Data augmentation methods - 'simclr', 'randaug', 'hflip'
 _C.DATASET.AUG_METHOD = 'hflip' 
 # Accepted Datasets
-_C.DATASET.ACCEPTED = ["blink_fold0", "blink_fold1", "blink_fold2", "blink_fold3", "blink2_fold0", "blink2_fold1", "blink2_fold2", "blink2_fold3", "blink2_fold4", 'MNIST','SVHN','CIFAR10','CIFAR100','TINYIMAGENET', 'IMBALANCED_CIFAR10', 'IMBALANCED_CIFAR100', 'IMAGENET50', 'IMAGENET100', 'IMAGENET200']
+_C.DATASET.ACCEPTED = ["blinkleaveoneout", "blink_fold0", "blink_fold1", "blink_fold2", "blink_fold3", "blink2_fold0", "blink2_fold1", "blink2_fold2", "blink2_fold3", "blink2_fold4", 'MNIST','SVHN','CIFAR10','CIFAR100','TINYIMAGENET', 'IMBALANCED_CIFAR10', 'IMBALANCED_CIFAR100', 'IMAGENET50', 'IMAGENET100', 'IMAGENET200']
 
 _C.DATASET.FOLD_IDX = 0
 

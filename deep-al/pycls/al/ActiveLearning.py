@@ -160,8 +160,10 @@ class ActiveLearning:
         
         elif self.cfg.ACTIVE_LEARNING.SAMPLING_FN.lower() in ["prob_cover", 'probcover']:
             from .prob_cover import ProbCover
+            patient_code = kwargs["patient_code"]
+            emb_path = self.cfg.ACTIVE_LEARNING.EMBEDDING_PATH.format(patient_code=patient_code)
             probcov = ProbCover(self.cfg, lSet, uSet, budgetSize=self.cfg.ACTIVE_LEARNING.BUDGET_SIZE,
-                            delta=self.cfg.ACTIVE_LEARNING.DELTA, embedding_path=self.cfg.ACTIVE_LEARNING.EMBEDDING_PATH)
+                            delta=self.cfg.ACTIVE_LEARNING.DELTA, embedding_path=emb_path)
             activeSet, uSet = probcov.select_samples()
         elif self.cfg.ACTIVE_LEARNING.SAMPLING_FN == "random_on_blinking_period":
             assert self.cfg.DATASET.IS_BLINKING, "is_blinking needed to be true. to restrict the training set to have only blinking part"
@@ -172,8 +174,10 @@ class ActiveLearning:
             # assert
             from .embedding_difference_as_probability_density import EmbeddingDifferenceAsProbabilityDensity
             dataset_info = kwargs["dataset_info"]
+            patient_code = kwargs["patient_code"]
+            emb_path = self.cfg.ACTIVE_LEARNING.EMBEDDING_PATH.format(patient_code=patient_code)
             al = EmbeddingDifferenceAsProbabilityDensity(self.cfg, lSet, uSet, self.cfg.ACTIVE_LEARNING.BUDGET_SIZE,
-                                                         self.cfg.ACTIVE_LEARNING.EMBEDDING_PATH, dataset_info, kernel_size=11)
+                                                         emb_path, dataset_info, kernel_size=11)
             activeSet, uSet = al.select_samples()
         elif self.cfg.ACTIVE_LEARNING.SAMPLING_FN == "embedding_difference_as_probability_density_reduce_high_frame_prob":
             # assert

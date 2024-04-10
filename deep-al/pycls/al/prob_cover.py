@@ -16,6 +16,7 @@ class ProbCover:
         self.budgetSize = budgetSize
         self.delta = delta
         self.relevant_indices = np.concatenate([self.lSet, self.uSet]).astype(int)
+        print(self.all_features.shape)
         self.rel_features = self.all_features[self.relevant_indices]
         self.graph_df = self.construct_graph()
 

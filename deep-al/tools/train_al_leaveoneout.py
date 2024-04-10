@@ -4,9 +4,6 @@ import sys
 from datetime import datetime
 import argparse
 from time import perf_counter
-import random
-from math import floor, ceil
-import copy
 
 import numpy as np
 import torch
@@ -16,8 +13,6 @@ import torch.nn as nn
 # import torch.optim as optim
 import torch.profiler
 import torchvision.transforms as transforms
-from PIL import Image, ImageEnhance, ImageFilter
-# from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 from matplotlib.offsetbox import (OffsetImage, AnnotationBbox)    
 from utils import CustomImageDataset4, imshow_kp, batch_process_pip_out, MetricsStorage, cal_and_process_meanface, imshow_kp_from_dl
@@ -33,13 +28,12 @@ def add_path(path):
 add_path(os.path.abspath('..'))
 
 from pycls.al.ActiveLearning import ActiveLearning
-# from pycls.al.ActiveLearningTest import ActiveLearning
 import pycls.core.builders as model_builder
 from pycls.core.config import cfg, dump_cfg
 # import pycls.core.losses as losses
 import pycls.core.optimizer as optim
 from pycls.datasets.data import Data
-import pycls.utils.checkpoint as cu
+# import pycls.utils.checkpoint as cu
 import pycls.utils.logging as lu
 # import pycls.utils.metrics as mu
 # import pycls.utils.net as nu
@@ -49,7 +43,7 @@ from pycls.datasets.blink_dataset_with_no_test_set import BlinkDataset2
 from pycls.datasets.blink_dataset_all import BlinkDatasetAll
 import pycls.datasets.utils as ds_utils
 
-from eval_pip import eval_on_pipnet
+from utils import eval_on_pipnet
 
 logger = lu.get_logger(__name__)
 # model params
@@ -246,7 +240,7 @@ def plot_metrics_al(losses: dict, update_dataset_at: list, title:str="loss", sho
 def plot_all_metrics(n_epochs_for_ac_iter, training_losses, validation_losses, training_mses, validation_mses, training_mses_nb, validation_mses_nb, save_path):
     plt.subplot(3, 1, 1)
     plot_metrics_al({"training loss": training_losses, "validation loss": validation_losses}, n_epochs_for_ac_iter, title="loss", show=False)
-    plt.yscale("log")
+    # plt.yscale("log")
     plt.subplot(3, 1, 2)
     plot_metrics_al({"training mses": training_mses, "validation mses": validation_mses}, n_epochs_for_ac_iter, title="mse", show=False)
     plt.yscale("log")
@@ -268,8 +262,8 @@ def get_frame_selected_patient_wise(all_sampled_set, train_data):
 
     return frame_selected_patient_wise
 
-def calculate_param_for_plot_embedding(cfg, dataset_info):
-    embeddings = ds_utils.load_embededing_from_path(cfg.ACTIVE_LEARNING.EMBEDDING_PATH)
+def calculate_param_for_plot_embedding(embedding_path, dataset_info):
+    embeddings = ds_utils.load_embededing_from_path(embedding_path)
     tb = np.concatenate([[0], dataset_info["frames"].cumsum()])
     kernel_size = 11
     kernel = np.ones(kernel_size)/kernel_size
@@ -279,6 +273,8 @@ def calculate_param_for_plot_embedding(cfg, dataset_info):
         start_idx = tb[row_idx]
         end_idx = tb[row_idx+1]
         a_patient_embedding = embeddings[start_idx:end_idx] # embedding of a patient
+        if np.prod(a_patient_embedding.shape) == 0:
+                continue
         centroid_emb = a_patient_embedding.mean(0)
         mean_square_diff_emb = np.mean(np.square(a_patient_embedding - centroid_emb), axis=1)
         smoothed_mean_square_diff_emb = np.zeros_like(mean_square_diff_emb)
@@ -298,9 +294,10 @@ def calculate_param_for_plot_embedding(cfg, dataset_info):
     z = y / y.sum() # prob density
     pd_max = z.max()
     pd_min = z.min()
-    return tb, pd_min, pd_max, 
+    return z, tb, pd_min, pd_max, 
 
-def plot_selected_frames(exp_dir, dataset_info, patient_wise, train_data, use_embedding=False, tb=None, pd_min=None, pd_max=None):
+def plot_selected_frames(exp_dir, dataset_info, patient_wise, train_data, use_embedding=False, z=None, tb=None, pd_min=None, pd_max=None):
+    print(tb)
     plt.figure(figsize=(2000/150, 3000/150), dpi=150)
     plt.subplots_adjust(hspace=0.4)
     for idx, (row_idx, eye_info) in enumerate(dataset_info.iterrows()):
@@ -431,11 +428,13 @@ def main(cfg):
         dataset_info = all_data.dataset.dataset_info
     else:
         dataset_info = None
+        print("expect blink dataset")
         exit(0)
     all_patient_code = dataset_info["patient_code"].unique()
     msg = "Dataset {} Loaded Sucessfully. Total Train Size: {}\n".format(cfg.DATASET.NAME, train_size,)
     print(msg);logger.info(msg)
-
+    print(all_patient_code)
+    # exit(0)
     for patient_code in all_patient_code:
         print("training set size before spliting", len(all_data))
         exp_patient_dir = os.path.join(cfg.EXP_DIR, patient_code)
@@ -450,8 +449,8 @@ def main(cfg):
         model = model_builder.get_keypoint_model(num_nb, num_lms, input_size, net_stride)
         init_model_state_dict = torch.load(cfg.MODEL_INIT_WEIGHTS, map_location=device)
         model.load_state_dict(init_model_state_dict, strict=False); model.train()
-        model = model.to(device)
-        model = torch.nn.parallel.DataParallel(model, [1, 0], output_device=device)
+        # model = model.to(device)
+        model = torch.nn.parallel.DataParallel(model, [device])
         
         # # Construct the optimizer
         optimizer = optim.construct_optimizer(cfg, model)
@@ -505,8 +504,11 @@ def main(cfg):
         msg = "Leaving {} as unlabeled set, Labeled Set: {}, Unlabeled Set: {}\n".format(patient_code, len(lSet), len(uSet))
         print(msg); logger.info(msg)
 
-        best_pretrained_model_save_path = os.path.join(exp_patient_dir, f"init_best_{len(train_dataset)}n.pt")
         last_pretrained_model_save_path = os.path.join(exp_patient_dir, f"init_last_{len(train_dataset)}n.pt")
+        best_pretrained_model_save_path = cfg.PRETRAINED_WEIGHTS_EACH_PATIENT.format(patient_code=patient_code, n_train=len(train_dataset))
+        if not os.path.exists(best_pretrained_model_save_path):
+            best_pretrained_model_save_path = os.path.join(exp_patient_dir, f"init_best_{len(train_dataset)}n.pt")
+
         metrics = MetricsStorage()
         # Train init model
         msg = "======== TRAINING INIT ========"
@@ -528,6 +530,7 @@ def main(cfg):
             plt.figure(figsize=(1000/100, 1000/100), dpi=100)
             plot_all_metrics(metrics.n_epochs_for_ac_iter, metrics.training_losses, metrics.validation_losses, metrics.training_mses, metrics.validation_mses, metrics.training_mses_nb, metrics.validation_mses_nb, os.path.join(exp_patient_dir, "init_losses.png"))
             plt.close("all")
+        
         # model_mse, model_mse_nb, model_mae, model_mae_nb = eval_on_pipnet(model, lSet_loader, reverse_index1, reverse_index2, max_len, device)
         # print("train: ", model_mse, model_mse_nb, model_mae, model_mae_nb)
         # model_mse, model_mse_nb, model_mae, model_mae_nb = eval_on_pipnet(model, valSet_loader, reverse_index1, reverse_index2, max_len, device)
@@ -535,7 +538,7 @@ def main(cfg):
         # imshow_kp_from_dl(model, lSet_loader, valSet_loader, device, reverse_index1, reverse_index2, max_len, "train_train_val.png")
         
         # exit(0)
-        lSet = []
+        lSet = np.asarray([])
         all_sampled_set = []
         msg = "drop all patient, to be added from uSet"
         print(msg);logger.info(msg)
@@ -554,9 +557,9 @@ def main(cfg):
             logger.info("======== ACTIVE SAMPLING ========\n")
             al_obj = ActiveLearning(data_obj, cfg, cur_episode+1, dataset_info)
             if cfg.ACTIVE_LEARNING.SAMPLING_FN == "typiclust_rp":
-                activeSet, new_uSet, clusters = al_obj.sample_from_uSet(model, lSet, uSet, all_data, dataset_info=dataset_info if "blink" in cfg.DATASET.NAME else None)
+                activeSet, new_uSet, clusters = al_obj.sample_from_uSet(model, lSet, uSet, all_data, dataset_info=dataset_info if "blink" in cfg.DATASET.NAME else None, patient_code=patient_code)
             else:
-                activeSet, new_uSet = al_obj.sample_from_uSet(model, lSet, uSet, all_data, dataset_info=dataset_info if "blink" in cfg.DATASET.NAME else None)
+                activeSet, new_uSet = al_obj.sample_from_uSet(model, lSet, uSet, all_data, dataset_info=dataset_info if "blink" in cfg.DATASET.NAME else None, patient_code=patient_code)
 
             all_sampled_set.append(activeSet)
             # Save current lSet, new_uSet and activeSet in the episode directory
@@ -579,15 +582,15 @@ def main(cfg):
             print("================================\n\n")
             logger.info("================================\n\n")
 
-            print("load existing pretrained model")
             if not skip_training and not cfg.ACTIVE_LEARNING.FINE_TUNE: 
                 # load model from the previous al iter
                 # init_model_state_dict = torch.load(best_init_model_save_path)
+                print("load existing pretrained model")
                 model.load_state_dict(pretrained_model_state_dict)
                 
             # optimizer.load_state_dict(opt_init_state)
             optimizer = optim.construct_optimizer(cfg_for_finetune, model)
-            print("optimizer for finetuning", optimizer)
+            # print("optimizer for finetuning", optimizer)
             
             if not skip_training:
                 # Train model
@@ -621,6 +624,7 @@ def main(cfg):
                 plot_all_metrics(metrics.n_epochs_for_ac_iter, metrics.training_losses, metrics.validation_losses, metrics.training_mses, metrics.validation_mses, metrics.training_mses_nb, metrics.validation_mses_nb, os.path.join(exp_patient_dir, "al_losses.png"))
                 plt.close("all")
             # os.remove(checkpoint_file)
+            # break
         with open(os.path.join(exp_patient_dir, "training_metrics.pkl"), 'wb') as f:
             pickle.dump(metrics, f)
 
@@ -634,10 +638,10 @@ def main(cfg):
         if all_sampled_set.size > 0:
             frame_selected_patient_wise = get_frame_selected_patient_wise(all_sampled_set, all_data)
             use_embedding = any([cfg.ACTIVE_LEARNING.SAMPLING_FN in s for s in ["probcover", "typiclust_rp", "embedding_difference_as_probability_density", ]])
-            tb = pd_max = pd_min = None
+            z = tb = pd_max = pd_min = None
             if use_embedding:
-                tb, pd_min, pd_max = calculate_param_for_plot_embedding(cfg, dataset_info)
-            plot_selected_frames(exp_patient_dir, dataset_info, frame_selected_patient_wise, all_data, use_embedding, tb, pd_min, pd_max)
+                z, tb, pd_min, pd_max = calculate_param_for_plot_embedding(cfg.ACTIVE_LEARNING.EMBEDDING_PATH.format(patient_code=patient_code), dataset_info)
+            plot_selected_frames(exp_patient_dir, dataset_info, frame_selected_patient_wise, all_data, use_embedding, z, tb, pd_min, pd_max)
 
         # break # for debug purpose
 
