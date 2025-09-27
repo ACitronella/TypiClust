@@ -184,7 +184,7 @@ class CustomImageDataset4(Dataset):
 
         # cache for small dataset
         self.cache_xy = None
-        if len(self.allow_idxs) < 5000:
+        if len(self.allow_idxs) < 10000:
             self.cache_xy = [None] * len(self.allow_idxs)
         
     def __len__(self):

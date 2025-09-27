@@ -16,6 +16,7 @@ def add_path(path):
         sys.path.insert(0, path)
 add_path(os.path.abspath('../deep-al'))
 from pycls.datasets.blink_dataset_all import BlinkDatasetAll
+from pycls.datasets.blink_dataset_progressive import BlinkDatasetProgressive
 from pycls.datasets.data import Data
 
 def get_criterion(p):
@@ -180,6 +181,17 @@ def get_train_dataset(p, transform, to_augmented_dataset=False,
         from data.imagenet import ImageNetSubset
         subset_file = './data/imagenet_subsets/%s.txt' %(p['train_db_name'])
         dataset = ImageNetSubset(subset_file=subset_file, split='train', transform=transform)
+    elif "blink_progressive" in p['train_db_name']:
+        dataset = BlinkDatasetProgressive(train=True, transform=None, test_transform=None, dataset_path="../../../pytorchlm")
+        FOLDS = 5
+        dataset_info = dataset.dataset_info
+        fold_idx = p["fold_idx"]
+        train_patient_code = dataset_info[dataset_info["fold_idx"] == (fold_idx + 1) % FOLDS]["patient_code"].unique()
+        unlabel_patient_code = dataset_info[(dataset_info["fold_idx"] != (fold_idx + 2) % FOLDS) & (dataset_info["fold_idx"] != (fold_idx + 1) % FOLDS) & (dataset_info["fold_idx"] != (fold_idx) % FOLDS)]["patient_code"].unique()
+        # val_patient_code = dataset_info[(dataset_info["fold_idx"] == (fold_idx + 2) % FOLDS)]["patient_code"].unique()
+        train_idx, _, _ = Data.makeLUNSetsByPatientsNotSave(train_patient_code, unlabel_patient_code, dataset)
+        dataset = torch.utils.data.Subset(dataset, train_idx)
+        dataset = DSWrapper(dataset, transform)
 
     elif "blink_all" in p['train_db_name']:
         dataset = BlinkDatasetAll(train=True, transform=None, test_transform=None, dataset_path="../../../pytorchlm")
@@ -244,6 +256,17 @@ def get_val_dataset(p, transform=None, to_neighbors_dataset=False):
         from data.imagenet import ImageNetSubset
         subset_file = './data/imagenet_subsets/%s.txt' %(p['val_db_name'])
         dataset = ImageNetSubset(subset_file=subset_file, split='val', transform=transform)
+    elif "blink_progressive" in p['train_db_name']:
+        dataset = BlinkDatasetProgressive(train=False, transform=transform, test_transform=None, dataset_path="../../../pytorchlm")
+        # FOLDS = 5
+        # dataset_info = dataset.dataset_info
+        # fold_idx = p["fold_idx"]
+        # train_patient_code = dataset_info[dataset_info["fold_idx"] == (fold_idx + 1) % FOLDS]["patient_code"].unique()
+        # unlabel_patient_code = dataset_info[(dataset_info["fold_idx"] != (fold_idx + 2) % FOLDS) & (dataset_info["fold_idx"] != (fold_idx + 1) % FOLDS) & (dataset_info["fold_idx"] != (fold_idx) % FOLDS)]["patient_code"].unique()
+        # val_patient_code = dataset_info[(dataset_info["fold_idx"] == (fold_idx + 2) % FOLDS)]["patient_code"].unique()
+        # train_idx, unlabel_idx, _ = Data.makeLUNSetsByPatientsNotSave(train_patient_code, unlabel_patient_code, dataset)
+        # dataset = torch.utils.data.Subset(dataset, np.concatenate([train_idx, unlabel_idx]))
+        dataset = DSWrapper(dataset, transform)
     elif "blink_all" in p["train_db_name"]:
         dataset = BlinkDatasetAll(train=False, transform=transform, test_transform=None, dataset_path="../../../pytorchlm")
         # pcode_to_include = p["fold_idx"]

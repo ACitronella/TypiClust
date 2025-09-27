@@ -861,21 +861,8 @@ def main(cfg):
                                       pil_augment=False)
     
     # plot assertion, if any keypoint are not align, check immediately
-    xy = train_dataset[0]
-    img = xy[0]
-    plt.figure()
-    kp, kp_merge = process_pip_out(xy[1].unsqueeze(0), xy[2].unsqueeze(0), xy[3].unsqueeze(0), xy[4].unsqueeze(0), xy[5].unsqueeze(0), reverse_index1, reverse_index2, max_len)
-    imshow_kp(img, lms_pred=kp)
-    plt.savefig(os.path.join(exp_dir, "assert-train.png"), bbox_inches='tight')
-    assert np.isclose(kp, kp_merge).all()
-    
-    xy = val_dataset[0]
-    img = xy[0]
-    plt.figure()
-    kp, kp_merge = process_pip_out(xy[1].unsqueeze(0), xy[2].unsqueeze(0), xy[3].unsqueeze(0), xy[4].unsqueeze(0), xy[5].unsqueeze(0), reverse_index1, reverse_index2, max_len)
-    imshow_kp(img, lms_pred=kp)
-    plt.savefig(os.path.join(exp_dir, "assert-val.png"), bbox_inches='tight')
-    assert np.isclose(kp, kp_merge).all()
+    assert sanity_check_dataset(train_dataset, exp_dir, reverse_index1, reverse_index2, max_len)
+
 
     train_dataloader_wrapper = functools.partial(DataLoader, batch_size=cfg.TRAIN.BATCH_SIZE, num_workers=8, shuffle=True, pin_memory=False)
     val_dataloader_wrapper = functools.partial(DataLoader, batch_size=512, num_workers=0, shuffle=False, pin_memory=False)

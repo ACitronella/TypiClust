@@ -19,6 +19,7 @@ from pycls.datasets.tiny_imagenet import TinyImageNet
 from pycls.datasets.blink_dataset import BlinkDataset, ImageDataFrameBlinkingWrapper
 from pycls.datasets.blink_dataset_with_no_test_set import BlinkDataset2
 from pycls.datasets.blink_dataset_all import BlinkDatasetAll
+from pycls.datasets.blink_dataset_progressive import BlinkDatasetProgressive
 logger = lu.get_logger(__name__)
 
 class _RepeatSampler(object):
@@ -261,6 +262,9 @@ class Data:
         elif self.dataset ==  'IMBALANCED_CIFAR100':
             im_cifar100 = IMBALANCECIFAR100(save_dir, train=isTrain, transform=preprocess_steps, test_transform=test_preprocess_steps)
             return im_cifar100, len(im_cifar100)
+        elif "blinkprogressive" in self.dataset:
+            im_blink = BlinkDatasetProgressive(train=isTrain, transform=preprocess_steps, test_transform=test_preprocess_steps, dataset_path=save_dir, fold_idx=fold_idx)
+            return im_blink, len(im_blink)
         elif "blinkleaveoneout" in self.dataset:
             is_blinking = kwargs.get('is_blinking')
             im_blink = BlinkDatasetAll(dataset_path=save_dir, train=isTrain, transform=preprocess_steps, test_transform=test_preprocess_steps, use_faster=kwargs["use_faster"] if "use_faster" in kwargs else (is_blinking is None))
@@ -423,10 +427,53 @@ class Data:
         train_patient = set([dataset.get_patient_code_and_frame_from_idx(idx)['patient_code'] for idx in lSet])
         unlabel_patient = set([dataset.get_patient_code_and_frame_from_idx(idx)['patient_code'] for idx in uSet])
         assert len(train_patient.intersection(unlabel_patient)) == 0, "In the seperation phase, label and unlabel must be disjoint."
-        print("train_patient: ", train_patient)
-        print("unlabel_patient: ", unlabel_patient)
+        # print("train_patient: ", train_patient)
+        # print("unlabel_patient: ", unlabel_patient)
 
         return lSet, uSet
+    
+    def makeLUNSetsByPatients(self, labeled_patient_code, unlabeled_patient_code, dataset, save_dir):
+        lSet, uSet, nSet = Data.makeLUNSetsByPatientsNotSave(labeled_patient_code, unlabeled_patient_code, dataset)
+        np.save(f'{save_dir}/lSet.npy', lSet)
+        np.save(f'{save_dir}/uSet.npy', uSet)    
+        np.save(f'{save_dir}/nSet.npy', nSet)    
+        return f'{save_dir}/lSet.npy', f'{save_dir}/uSet.npy', f'{save_dir}/nSet.npy'
+    
+    @staticmethod
+    def makeLUNSetsByPatientsNotSave(labeled_patient_code, unlabeled_patient_code, dataset): # rename pls
+        # assert self.dataset in self.datasets_accepted, "Sorry the dataset {} is not supported. Currently we support {}".format(self.dataset, self.datasets_accepted)
+        # assert any([ds_name in self.dataset for ds_name in ["blink"]]), "Sorry the dataset {} is not supported. Currently we support {}".format(self.dataset, ["blink2"])
+        lSet = [];uSet = [];nSet = []
+
+        dataset_info = dataset.dataset_info
+        indices_table = dataset.indices_table
+        patient_code = dataset_info["patient_code"].unique()
+
+        notuse_patient_code = np.setdiff1d(patient_code, np.concatenate([labeled_patient_code, unlabeled_patient_code]))
+        for p_code in unlabeled_patient_code:
+            this_patient_info = dataset_info[dataset_info["patient_code"] == p_code]
+            for idx in this_patient_info.index:
+                uSet.append(np.arange(indices_table[idx], indices_table[idx+1], dtype="int32"))
+        uSet = np.concatenate(uSet)
+        for p_code in notuse_patient_code:
+            this_patient_info = dataset_info[dataset_info["patient_code"] == p_code]
+            for idx in this_patient_info.index:
+                nSet.append(np.arange(indices_table[idx], indices_table[idx+1], dtype="int32"))
+        nSet = np.concatenate(nSet)
+        for p_code in labeled_patient_code:
+            this_patient_info = dataset_info[dataset_info["patient_code"] == p_code]
+            for idx in this_patient_info.index:
+                lSet.append(np.arange(indices_table[idx], indices_table[idx+1], dtype="int32"))
+        lSet = np.concatenate(lSet)
+
+        # sanity check
+        train_patient = set([dataset.get_patient_code_and_frame_from_idx(idx)['patient_code'] for idx in lSet])
+        unlabel_patient = set([dataset.get_patient_code_and_frame_from_idx(idx)['patient_code'] for idx in uSet])
+        notuse_patient = set([dataset.get_patient_code_and_frame_from_idx(idx)['patient_code'] for idx in nSet])
+        assert len(train_patient.intersection(unlabel_patient)
+                   .union(train_patient.intersection(notuse_patient))
+                   .union(unlabel_patient.intersection(notuse_patient))) == 0, "In the seperation phase, label and unlabel and validation must be disjoint."
+        return lSet, uSet, nSet
 
 
     def makeTVSets(self, val_split_ratio, data, seed_id, save_dir):
@@ -630,22 +677,22 @@ class Data:
             raise NotImplementedError
 
 
-    def loadPartitions(self, lSetPath, uSetPath, valSetPath):
+    # def loadPartitions(self, lSetPath, uSetPath, valSetPath):
 
-        assert isinstance(lSetPath, str), "Expected lSetPath to be a string."
-        assert isinstance(uSetPath, str), "Expected uSetPath to be a string."
-        assert isinstance(valSetPath, str), "Expected valSetPath to be a string."
+    #     assert isinstance(lSetPath, str), "Expected lSetPath to be a string."
+    #     assert isinstance(uSetPath, str), "Expected uSetPath to be a string."
+    #     assert isinstance(valSetPath, str), "Expected valSetPath to be a string."
 
-        lSet = np.load(lSetPath, allow_pickle=True)
-        uSet = np.load(uSetPath, allow_pickle=True)
-        valSet = np.load(valSetPath, allow_pickle=True)
+    #     lSet = np.load(lSetPath, allow_pickle=True)
+    #     uSet = np.load(uSetPath, allow_pickle=True)
+    #     valSet = np.load(valSetPath, allow_pickle=True)
 
-        #Checking no overlap
-        assert len(set(valSet) & set(uSet)) == 0,"Intersection is not allowed between validationset and uset"
-        assert len(set(valSet) & set(lSet)) == 0,"Intersection is not allowed between validationset and lSet"
-        assert len(set(uSet) & set(lSet)) == 0,"Intersection is not allowed between uSet and lSet"
+    #     #Checking no overlap
+    #     assert len(set(valSet) & set(uSet)) == 0,"Intersection is not allowed between validationset and uset"
+    #     assert len(set(valSet) & set(lSet)) == 0,"Intersection is not allowed between validationset and lSet"
+    #     assert len(set(uSet) & set(lSet)) == 0,"Intersection is not allowed between uSet and lSet"
 
-        return lSet, uSet, valSet
+    #     return lSet, uSet, valSet
     
     def loadLUPartitions(self, lSetPath, uSetPath):
         assert isinstance(lSetPath, str), "Expected lSetPath to be a string."
@@ -657,6 +704,16 @@ class Data:
         #Checking no overlap
         assert len(set(uSet) & set(lSet)) == 0,"Intersection is not allowed between uSet and lSet"
         return lSet, uSet
+
+    def loadPartitions(self, *idx_path):
+        assert all([isinstance(p, str) for p in idx_path]), "Expected Path to be a string."
+
+        idx = [np.load(p, allow_pickle=True) for p in idx_path]
+
+        #Checking no overlap
+        v, count = np.unique(np.concatenate(idx), return_counts=True)
+        assert (count == 1).all(),"Intersection is not allowed between uSet and lSet"
+        return idx
 
     def loadTVPartitions(self, trainSetPath, valSetPath):
 

@@ -1,6 +1,7 @@
 # Folder name where best model logs etc are saved. "auto" creates a timestamp based folder
 EXP_NAME: 'random_80epochs'
-RNG_SEED: 32
+RNG_SEED: 312
+PRETRAINED_WEIGHTS_EACH_PATIENT: "some where it should not exist"
 DATASET:
   NAME: blinkleaveoneout # or CIFAR100, MNIST, SVHN, TinyImageNet
   FOLD_IDX: 0

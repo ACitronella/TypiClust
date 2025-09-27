@@ -472,7 +472,7 @@ def main(cfg):
         pil_augment = True
         criterion_cls = nn.MSELoss()
         criterion_reg = nn.L1Loss()
-        scheduler = None
+        scheduler = None # this is builtin to the optim
         
         indicate_best_by = cfg.TRAIN.INDICATE_BEST_BY
         how_best="min"

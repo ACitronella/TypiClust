@@ -16,7 +16,6 @@ class ProbCover:
         self.budgetSize = budgetSize
         self.delta = delta
         self.relevant_indices = np.concatenate([self.lSet, self.uSet]).astype(int)
-        print(self.all_features.shape)
         self.rel_features = self.all_features[self.relevant_indices]
         self.graph_df = self.construct_graph()
 
@@ -31,7 +30,7 @@ class ProbCover:
         xs, ys, ds = [], [], []
         print(f'Start constructing graph using delta={self.delta}')
         # distance computations are done in GPU
-        cuda_feats = torch.tensor(self.rel_features).cuda()
+        cuda_feats = torch.tensor(self.rel_features).to(f"cuda:{self.cfg.GPU_ID}")
         for i in range(len(self.rel_features) // batch_size):
             # distance comparisons are done in batches to reduce memory consumption
             cur_feats = cuda_feats[i * batch_size: (i + 1) * batch_size]

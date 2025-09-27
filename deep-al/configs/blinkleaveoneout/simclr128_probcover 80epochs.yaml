@@ -1,7 +1,7 @@
 # Folder name where best model logs etc are saved. "auto" creates a timestamp based folder
 EXP_NAME: 'simclr128_probcover0.3_80epochs'
 RNG_SEED: 52
-PRETRAINED_WEIGHTS_EACH_PATIENT: "../model_graveyard_but_leaveoneout/test/{patient_code}/init_best_{n_train}n.pt"
+PRETRAINED_WEIGHTS_EACH_PATIENT: "../model_graveyard_rerunboth2/leaveoneout/random_80epochs/{patient_code}/init_best_{n_train}n.pt"
 
 DATASET:
   NAME: blinkleaveoneout # or CIFAR100, MNIST, SVHN, TinyImageNet

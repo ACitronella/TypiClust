@@ -81,8 +81,8 @@ class MemoryBank(object):
         self.pre_lasts = self.pre_lasts.to(device)
         self.device = device
 
-    def cpu(self):
-        self.to('cpu')
+    # def cpu(self):
+    #     self.to('cpu')
 
-    def cuda(self):
-        self.to('cuda:0')
+    # def cuda(self):
+    #     self.to('cuda:0')

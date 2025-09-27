@@ -1,7 +1,7 @@
 # Folder name where best model logs etc are saved. "auto" creates a timestamp based folder
-EXP_NAME: 'simclr128_embdiff_80epochs'
-RNG_SEED: 52
-PRETRAINED_WEIGHTS_EACH_PATIENT: "../model_graveyard_but_leaveoneout/test/{patient_code}/init_best_{n_train}n.pt"
+EXP_NAME: 'simclr128_embdiff'
+RNG_SEED: 82
+PRETRAINED_WEIGHTS_EACH_PATIENT: "../model_graveyard_rerunboth2/leaveoneout/random_80epochs/{patient_code}/init_best_{n_train}n.pt"
 
 DATASET:
   NAME: blinkleaveoneout # or CIFAR100, MNIST, SVHN, TinyImageNet
@@ -34,7 +34,7 @@ OPTIM: # unused for now
   # Learning rate policy select from {'cos', 'exp', 'steps'}
   LR_POLICY: steps
   # Steps for 'steps' policy (in epochs)
-  STEPS: [30, 60] #[0, 30, 60, 90]
+  STEPS: [30, 40] #[0, 30, 60, 90]
   LR_MULT: 0.1
   # Training Epochs
   # MAX_EPOCH: 1
@@ -55,7 +55,7 @@ TRAIN:
   IM_CHANNELS: 3
   # Evaluate model on test data every eval period epochs
   # EVAL_PERIOD: 1 
-  NUM_EPOCHS: 40
+  NUM_EPOCHS: 80
   INDICATE_BEST_BY: "validation_mses"
 TEST:
   SPLIT: test

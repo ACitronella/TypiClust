@@ -59,6 +59,9 @@ def main():
     # fold_in_name = m.group(1)
     # assert str(p["fold_idx"]) == fold_in_name
     
+    device = torch.device("cuda", args.gpu_id)
+    print(device)
+
     # Model
     print(colored('Retrieve model', 'blue'))
     model = get_model(p)
@@ -100,12 +103,14 @@ def main():
     # else:
     base_dataset = get_val_dataset(p, val_transforms) # Dataset w/o augs for knn eval
     base_dataloader = get_val_dataloader(p, base_dataset)
-    # next(iter(base_dataloader))
+    print("base dataset:", len(base_dataset))
+    # exit(0)
+
     memory_bank_base = MemoryBank(len(base_dataset), 
                                 p['model_kwargs']['features_dim'],
                                 p['num_classes'], p['criterion_kwargs']['temperature'], 
                                 p['model_kwargs']['pre_lasts_dim'])
-    memory_bank_base.cuda()
+    memory_bank_base.to(device)
     # memory_bank_val = MemoryBank(len(val_dataset),
     #                             p['model_kwargs']['features_dim'],
     #                             p['num_classes'], p['criterion_kwargs']['temperature'],
@@ -117,12 +122,10 @@ def main():
     criterion = get_criterion(p)
     print('Criterion is {}'.format(criterion.__class__.__name__))
     criterion = criterion.cuda()
-
     # Optimizer and scheduler
     print(colored('Retrieve optimizer', 'blue'))
     optimizer = get_optimizer(p, model)
     print(optimizer)
-    device = torch.device("cuda", args.gpu_id)
  
     # Checkpoint
     if os.path.exists(p['pretext_checkpoint']):
@@ -257,6 +260,7 @@ def main():
 
 if __name__ == '__main__':
     assert args.gpu_id in [0, 1]
+    print("gpu_id:", args.gpu_id)
     if args.use_batch_sampler:
         main()
     else:
